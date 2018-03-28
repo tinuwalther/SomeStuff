@@ -16,4 +16,7 @@ foreach($item in $LoggedOnUsers){
 ````
 
 ## Hostname
-
+````
+(Get-ChildItem HKLM:\SYSTEM\ControlSet001\Control\ComputerName)
+(Get-ChildItem HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName)
+````
