@@ -16,6 +16,7 @@ foreach($item in $LoggedOnUsers){
 ````
 
 ## Hostname
+Check the ComputerName not changed
 ````
 function Get-LastSavedComputerName{
     [CmdletBinding()]
@@ -44,4 +45,10 @@ if ($CurrentComputerName -ne $LastSavedComputerName){
 else{
     Write-Host "Current ComputerName is equal to Last ComputerName: $LastSavedComputerName" -ForegroundColor Green
 }
+````
+
+## Certificate
+Get Root Certificate
+````
+Get-ChildItem Cert:\LocalMachine\Root | Select-Object FriendlyName,DnsNameList,NotBefore,NotAfter
 ````
