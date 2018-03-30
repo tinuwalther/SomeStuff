@@ -1,13 +1,13 @@
 function Test-IsUserMemberOfAdmin{
     [CmdletBinding()]
     param(
-        [String]$LocalAccount
+        [Parameter(Mandatory=$true)][String]$LocalAccount
     )
     $function = $($MyInvocation.MyCommand.Name)
     $ret = $false
     try{
         $Administrators = Get-LocalGroupMember -SID S-1-5-32-544  
-        if($Administrators.Name -match "$LocalAccount"){   
+        if($Administrators.Name -match $LocalAccount){   
             $ret = $true   
         }     
     }
