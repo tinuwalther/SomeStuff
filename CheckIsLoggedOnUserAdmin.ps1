@@ -22,6 +22,6 @@ function Test-IsUserMemberOfAdmin{
 $LoggedOnUsers = (Get-CimInstance Win32_LoggedOnUser).antecedent.name | Select-Object -Unique
 foreach($item in $LoggedOnUsers){ 
     if(Test-IsUserMemberOfAdmin -LocalAccount "$($env:ComputerName)\\$item"){
-        @{$item='LocalAdmin'}
+        @{LocalAdmin=$item}
     }
 }
