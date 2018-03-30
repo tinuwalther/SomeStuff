@@ -13,4 +13,4 @@ function Get-ExpiredCertificates{
     return $ret
 }
 
-Get-ExpiredCertificates | Select-Object Thumbprint,FriendlyName,DnsNameList,Issuer,NotBefore,NotAfter,PSPath
+Get-ExpiredCertificates | Select-Object Thumbprint,Subject,FriendlyName,DnsNameList,Issuer,NotBefore,NotAfter,PSPath
