@@ -4,7 +4,7 @@ function Get-ExpiredCertificates{
     $function = $($MyInvocation.MyCommand.Name)
     $ret = $null
     try{
-        $ret = Get-ChildItem Cert:\LocalMachine\Root -ExpiringInDays 0
+        $ret = Get-ChildItem Cert:\ -ExpiringInDays 0 -Recurse
     }
     catch{
         Write-verbose "$($function): $($_.Exception.Message)"
@@ -13,4 +13,4 @@ function Get-ExpiredCertificates{
     return $ret
 }
 
-Get-ExpiredCertificates | Select-Object Thumbprint,FriendlyName,Issuer,NotBefore,NotAfter
+Get-ExpiredCertificates | Select-Object Thumbprint,FriendlyName,DnsNameList,Issuer,NotBefore,NotAfter,PSPath
