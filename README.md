@@ -48,7 +48,7 @@ else{
 ````
 
 ## Certificate
-Get Root Certificate
+Check expired Root Certificates
 ````
-Get-ChildItem Cert:\LocalMachine\Root | Select-Object FriendlyName,DnsNameList,NotBefore,NotAfter
+Get-ChildItem Cert:\LocalMachine\Root | Where-Object NotAfter -lt (Get-Date) | Select-Object FriendlyName,DnsNameList,NotBefore,NotAfter
 ````
