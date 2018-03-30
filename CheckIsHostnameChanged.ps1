@@ -20,6 +20,5 @@ $CurrentComputerName   = $env:COMPUTERNAME
 $LastSavedComputerName = Get-LastSavedComputerName -Verbose
 
 if ($CurrentComputerName -ne $LastSavedComputerName){
-    @{CurrentComputerName=$CurrentComputerName}
-    @{LastComputerName=$LastSavedComputerName}
+    @{ChangedComputerName="From $LastSavedComputerName to $CurrentComputerName"}
 }
