@@ -20,8 +20,6 @@ $CurrentComputerName   = $env:COMPUTERNAME
 $LastSavedComputerName = Get-LastSavedComputerName -Verbose
 
 if ($CurrentComputerName -ne $LastSavedComputerName){
-    Write-Host "Current ComputerName: $CurrentComputerName, Last ComputerName: $LastSavedComputerName" -ForegroundColor Red
-}
-else{
-    Write-Host "Current ComputerName is equal to Last ComputerName: $LastSavedComputerName" -ForegroundColor Green
+    @{CurrentComputerName=$CurrentComputerName}
+    @{LastComputerName=$LastSavedComputerName}
 }
