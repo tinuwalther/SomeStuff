@@ -157,9 +157,9 @@ function Get-Raminfo{
             $FreeRamMB     = [math]::round(($_.FreePhysicalMemory/(1024*1024)),2)
             $obj = [PSCustomObject]@{
                 TotalRamGB     = $TotalRamMB
-                FreeRamGB      = $FreeRamMB
-                UsedRamGB      = $TotalRamMB - $FreeRamMB
-                RamPercentFree = [math]::round((($FreeRamMB / $TotalRamMB) * 100),2)
+                UsedRamGB      = $TotalRamMB
+		FreeRamGB      = $FreeRamMB - $FreeRamMB
+                PercentFree    = [math]::round((($FreeRamMB / $TotalRamMB) * 100),2)
             }
             $ret  += $obj
         }
@@ -329,7 +329,6 @@ $LogsToCheck = @(
 foreach($item in $LogsToCheck){
     $records = Get-LastEventCodes -Logname $item -day $lastdays -Verbose
     if(-not([String]::IsNullOrEmpty($records))){
-        $records | Sort-Object TimeGenerated -Descending | ConvertTo-Json | ConvertFrom-Json
         $htmlTable = $records | Sort-Object TimeGenerated -Descending | ConvertTo-Html -Fragment 
         $HTMLMiddle += Set-HtmlMiddleEventlog -Logname $item -lastdays $lastdays -htmlTable $htmlTable 
     }
