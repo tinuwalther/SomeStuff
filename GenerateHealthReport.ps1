@@ -40,10 +40,9 @@ function Get-Raminfo{
                 $FreeRamGB     = [math]::round(($_.FreePhysicalMemory/(1024*1024)),2)
                 $obj = [PSCustomObject]@{
                     Name           = 'RAM'
-                    TotalRamGB     = $TotalRamGB
-                    #UsedRamGB      = $TotalRamMB - $FreeRamMB
-                    FreeRamGB      = $FreeRamGB
-                    PercentFree    = [math]::round((($FreeRamGB / $TotalRamGB) * 100),2)
+                    'Total(GB)' = "{0:0.00}" -f $TotalRamGB
+                    'Free(GB)'  = "{0:0.00}" -f $FreeRamGB
+                    'Free(%)'   = "{0:0}"    -f [math]::round((($FreeRamGB / $TotalRamGB) * 100),2)
                 }
                 $ret += $obj
             }
@@ -69,9 +68,12 @@ function Get-Diskinfo{
             $wmiobj | %{
                 $obj = [PSCustomObject]@{
                     Name        = $_.Name
-                    TotalSizeGB = [math]::round(($_.size/1gb),2)
-                    FreeSpaceGB = [math]::round(($_.freespace/1gb),2)
-                    PercentFree = [math]::round(($_.freespace/$_.size*100),2)
+                    VolumeName  = $_.VolumeName
+                    FileSystem  = $_.FileSystem
+                    Description = $_.Description
+                    'Total(GB)' = "{0:0.00}" -f [math]::round(($_.size/1gb),2)
+                    'Free(GB)'  = "{0:0.00}" -f [math]::round(($_.freespace/1gb),2)
+                    'Free(%)'   = "{0:0}"    -f [math]::round(($_.freespace/$_.size*100),2)
                 }
                 $ret += $obj
             }
@@ -157,15 +159,18 @@ function Get-TopProcesses{
     $function = $($MyInvocation.MyCommand.Name)
     $ret = @()
     try{
-        $wmiobj = Get-Process | Sort WorkingSet64 -Descending | Select ProcessName, Id, CPU, WorkingSet64, StartTime -First $ProccessNumToFetch
+        $wmiobj = Get-Process -ErrorAction Stop | Where-Object StartTime -ne $null | Sort WorkingSet64 -Descending | Select -First $ProccessNumToFetch
         if(-not([String]::IsNullOrEmpty($wmiobj))){
             $wmiobj | %{
                 $obj = [PSCustomObject]@{
-                    ProcessName  = $_.ProcessName
-                    ID           = $_.Id
-                    CPU          = $_.CPU
-                    WorkingSet64 = $_.WorkingSet64
-                    StartTime    = $_.StartTime
+                    ProcessName     = $_.ProcessName
+                    PID             = $_.Id
+                    'CPU(s)'        = "{0:0,0}" -f $_.CPU
+                    Threads         = $_.Threads.Count
+                    StartTime       = $_.StartTime
+                    'Allocated(KB)' = "{0:0,0}" -f ($_.WorkingSet64/(1024))
+                    Path            = $_.Path
+                    Description     = $_.Description
                 }
                 $ret += $obj
             }
@@ -242,6 +247,24 @@ if(-not([String]::IsNullOrEmpty($psobj))){
 }
 #endregion
 
+#region Processes
+$TopProcesses = 5
+$htmlTable    = $null
+$psobj        = $null
+$psobj        = Get-TopProcesses -ProccessNumToFetch $TopProcesses -Verbose
+if(-not([String]::IsNullOrEmpty($psobj))){
+    $script:HTMLMenu   += '<li><a href="#processes">Processes</a></li>'
+    $script:HTMLMiddle += '<h2 id="processes">Processes</h2>'
+    $htmlTable         = $psobj | ConvertTo-Html -Fragment 
+    $script:HTMLMiddle  += @"
+    <div>
+    <p>The following is a list of the <b>top $TopProcesses processes</b> with the most allocate memory.</p>
+    <table>$htmlTable</table>
+    </div>
+"@
+}
+#endregion
+
 #region Disk
 $PercentFree = 30
 $htmlTable   = $null
@@ -291,24 +314,6 @@ if(-not([String]::IsNullOrEmpty($psobj))){
     $script:HTMLMiddle  += @"
     <div>
     <p>The following is a list of all <b>stopped services</b> with start-mode <b>automatic</b>.</p>
-    <table>$htmlTable</table>
-    </div>
-"@
-}
-#endregion
-
-#region Processes
-$TopProcesses = 5
-$htmlTable    = $null
-$psobj        = $null
-$psobj        = Get-TopProcesses -ProccessNumToFetch $TopProcesses -Verbose
-if(-not([String]::IsNullOrEmpty($psobj))){
-    $script:HTMLMenu   += '<li><a href="#processes">Processes</a></li>'
-    $script:HTMLMiddle += '<h2 id="processes">Processes</h2>'
-    $htmlTable         = $psobj | ConvertTo-Html -Fragment 
-    $script:HTMLMiddle  += @"
-    <div>
-    <p>The following is a list of the <b>top $TopProcesses processes</b>.</p>
     <table>$htmlTable</table>
     </div>
 "@
