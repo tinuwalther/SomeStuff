@@ -33,7 +33,14 @@ function Get-RegItemPropertyValue{
     return $ret
 }
 
-$regkey = 'hklm:\Software\Company\ServerInfo'
+$now     = Get-Date -f 'yyyy-MM-dd HH:mm:ss'
+$rootkey = 'hklm:\Software\Company\ServerInfo'
+$regkey  = "$rootkey\$now"
+
+if(-not(Test-Path $regkey)){
+    New-Item -Path $regkey -Force
+}
+
 $hash   = @{
     ComputerName=$($env:computername)
     InstallDate=$(Get-Date)
@@ -46,4 +53,7 @@ $array   = @(
     'InstallDate'
 )
 
-Get-RegItemPropertyValue -Names $array -Root $regkey -verbose
+$childitems = Get-ChildItem -Path $rootkey
+foreach($item in $childitems){
+    Get-RegItemPropertyValue -Names $array -Root  $($item.Name -replace 'HKEY_LOCAL_MACHINE', 'hklm:') -verbose
+}
