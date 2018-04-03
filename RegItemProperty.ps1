@@ -15,13 +15,49 @@ function Set-RegItemProperty{
     }
 }
 
-function Get-RegItemPropertyValue{
+function Get-RegItemPropertyNames{
     [CmdletBinding()]
     param(
         [array]  $Names,
         [String] $Root
     )
     try{
+        $ret = @()
+        foreach($item in $Names){
+            $ret += $($item)
+        }
+    }
+    catch{
+        Write-verbose "$($function): $($_.Exception.Message)"
+        $Error.Clear()
+    }
+    return $ret
+}
+
+function Get-RegChildItemNames{
+    [CmdletBinding()]
+    param(
+        [String] $Root
+    )
+    try{
+        $ret = $null
+        $ret = Get-ChildItem -Path $Root | Select-Object -ExpandProperty PSChildName
+    }
+    catch{
+        Write-verbose "$($function): $($_.Exception.Message)"
+        $Error.Clear()
+    }
+    return $ret
+}
+
+function Get-RegItemPropertyValues{
+    [CmdletBinding()]
+    param(
+        [array]  $Names,
+        [String] $Root
+    )
+    try{
+        $ret = @()
         foreach($item in $Names){
             $ret += @{$($item)=Get-ItemPropertyValue -Path $Root -Name $($item) -ErrorAction Stop} 
         }
@@ -44,16 +80,22 @@ if(-not(Test-Path $regkey)){
 $hash   = @{
     ComputerName=$($env:computername)
     InstallDate=$(Get-Date)
+    Mode='Managed'
 }
 
 Set-RegItemProperty -values $hash -Root $regkey -verbose
 
 $array   = @(
     'ComputerName',
-    'InstallDate'
+    'InstallDate',
+    'Mode'
 )
 
-$childitems = Get-ChildItem -Path $rootkey
+$newest     = @()
+$now        = Get-Date
+$childitems = Get-RegChildItemNames -Root $rootkey -Verbose
 foreach($item in $childitems){
-    Get-RegItemPropertyValue -Names $array -Root  $($item.Name -replace 'HKEY_LOCAL_MACHINE', 'hklm:') -verbose
+    @{$item=(New-TimeSpan –Start (Get-Date $item) –End $now | Select-Object -ExpandProperty Ticks)}
+    #Get-RegItemPropertyNames  -Names $array -Root $("$rootkey\$item") -verbose
+    #Get-RegItemPropertyValues -Names $array -Root $("$rootkey\$item") -verbose
 }
