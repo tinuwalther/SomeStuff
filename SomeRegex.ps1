@@ -1,10 +1,10 @@
 <#
-  From a MemoryDump return the Crash-date as Sun May 28 00:30:51.221 2017 (UTC + 2:00)
-  But I need a normal DateTime-Object, so wtf should I do?
+  From a MemoryDump I returned the Crash-date as Sun May 28 00:30:51.221 2017 (UTC + 2:00),
+  but I need a normal DateTime-Object, so wtf should I do? Do It with RegEx!!!
 #>
 
 $contentString = 'Sun May 28 00:30:51.221 2017 (UTC + 2:00)'
-$regexString   = '^\w{1,3}\s\w{1,3}\s\d{1,2}\s\d{1,2}\:\d{1,2}\:\d{1,2}\.\d{1,3}\s\d{1,4}'
+$regexString   = '^\w{1,3}\s\w{1,3}\s\d{1,2}\s\d{1,2}\:\d{1,2}\:\d{1,2}\.\d{1,3}\s\d{4}'
 
 $regexDayMonth = '^\w{1,3}\s\w{1,3}\s\d{1,2}'
 $regexYear     = '\s\d{4}\s'
