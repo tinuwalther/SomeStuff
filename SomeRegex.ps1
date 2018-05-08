@@ -20,6 +20,6 @@ Get-Date($retDateString)
 <#
   Search User with SID
 #>
-$regexString   = '^S-1-5-21-\d{10}-\d{10}-\d{10}-500$'
+$regexString   = '^S-1-5-21-\d{10}-\d{10}-\d{10}-500$' or '^S\-1\-5\-21\-(\d+-){1,14}500$'
 $contentString = (Get-LocalUser | Where SID -match $regexString).SID
 $contentString | Select-String -Pattern $regexString -AllMatches
