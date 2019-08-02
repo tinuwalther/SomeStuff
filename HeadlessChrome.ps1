@@ -1,4 +1,6 @@
-
+<#
+  https://peter.sh/experiments/chromium-command-line-switches/#load-extension
+#>
 $path = "D:\Output\Report_20190731-123445"
 $url  = "file:///$($path -replace '\\', '/')"
 
