@@ -1,7 +1,12 @@
 Get-UDDashboard | Stop-UDDashboard
 
 #region Dataset
-$ps = "PowerShell Edition: $($PSVersionTable.Platform)`r`nPowerShell Edition: $($PSVersionTable.PSEdition)`r`nPowerShell Version: $($PSVersionTable.PSVersion)"
+$ps = @"
+PowerShell Edition: $($PSVersionTable.Platform)`r`n
+PowerShell Edition: $($PSVersionTable.PSEdition)`r`n
+PowerShell Version: $($PSVersionTable.PSVersion)`r`n`r`n
+PowerShell Home: $($PSHome)
+"@
 
 $out = $null
 Get-ChildItem $HOME | ForEach-Object {
@@ -13,7 +18,6 @@ $out = $out.TrimStart("`r`n")
 
 $Dashboard = New-UDDashboard -Title "Tinus Dashboard" -Content {
         
-    New-UDHeading -Text "Welcome on my Dashboard"-Size 2
     <#
     New-UDButton -Text "Get-Date!" -OnClick {
         Show-UDToast -Message (Get-Date)
@@ -44,7 +48,7 @@ $Dashboard = New-UDDashboard -Title "Tinus Dashboard" -Content {
             New-UDLink -Text 'Tinus EngOps Wiki' -Url 'https://tinuwalther.github.io/'
         ) -Size 'small' -BackgroundColor SteelBlue -FontColor White
 
-        New-UDCard -Title "HOME '$($HOME)' contains" -Text $out -BackgroundColor SteelBlue -FontColor White
+        New-UDCard -Title "HOME '$($HOME)'" -Text $out -BackgroundColor SteelBlue -FontColor White
         
         New-UDInput -Title "Test Website status" -Endpoint {
 
@@ -78,4 +82,4 @@ $Dashboard = New-UDDashboard -Title "Tinus Dashboard" -Content {
     #endregion
 }
 
-Start-UDDashboard -Dashboard $Dashboard -Port 10001
+Start-UDDashboard -Dashboard $Dashboard -Port 10001  -AutoReload
