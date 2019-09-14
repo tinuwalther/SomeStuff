@@ -40,7 +40,7 @@ $(($env:PSModulePath) -replace ':',"`r`n")
 "@
 
     $UpdateTitle = "Mac Updates"
-    $Hotfix = "not implemented yet"
+    $Hotfix = softwareupdate -l
 }
 elseif($IsLinux){
     $UpdateTitle = "Linux Updates"
@@ -64,53 +64,29 @@ $Dashboard = New-UDDashboard -Title "Tinus Dashboard" -Content {
     #region Layout
     New-UDLayout -Columns 6 -Content {
 
-        $webret1 = (Invoke-WebRequest -Uri 'https://tinuwalther.github.io' | Select-Object -ExpandProperty StatusCode)
-        if($webret1 -eq 200){
-            New-UDCounter -Title "EngOps Wiki" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret1} -Icon linux -BackgroundColor lightgreen -FontColor White
-        }
-        else{
-            New-UDCounter -Title "EngOps Wiki" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret1} -Icon linux -BackgroundColor Red -FontColor White
-        }
+        New-UDCounter -Title "EngOps Wiki" -Icon linux -AutoRefresh -RefreshInterval 900 -Endpoint {
+            (Invoke-WebRequest -Uri 'https://tinuwalther.github.io' | Select-Object -ExpandProperty StatusCode)
+        } -BackgroundColor lightgreen -FontColor White
         
-        $webret2 = (Invoke-WebRequest -Uri 'https://it.martin-walther.ch' | Select-Object -ExpandProperty StatusCode)
-        if($webret2 -eq 200){
-            New-UDCounter -Title "Tinus IT Wiki" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret2} -Icon linux -BackgroundColor lightgreen -FontColor White
-        }
-        else{
-            New-UDCounter -Title "Tinus IT Wiki" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret2} -Icon linux -BackgroundColor Red -FontColor White
-        }
+        New-UDCounter -Title "Tinus IT Wiki" -AutoRefresh -RefreshInterval 900 -Endpoint {
+            (Invoke-WebRequest -Uri 'https://it.martin-walther.ch' | Select-Object -ExpandProperty StatusCode)
+        } -Icon linux -BackgroundColor lightgreen -FontColor White
         
-        $webret3 = (Invoke-WebRequest -Uri 'https://foto.martin-walther.ch' | Select-Object -ExpandProperty StatusCode)
-        if($webret3 -eq 200){
-            New-UDCounter -Title "Foto & IT" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret3} -Icon linux -BackgroundColor lightgreen -FontColor White
-        }
-        else{
-            New-UDCounter -Title "Foto & IT" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret3} -Icon linux -BackgroundColor Red -FontColor White
-        }
+        New-UDCounter -Title "Foto & IT" -AutoRefresh -RefreshInterval 900 -Endpoint {
+            (Invoke-WebRequest -Uri 'https://foto.martin-walther.ch' | Select-Object -ExpandProperty StatusCode)
+        } -Icon linux -BackgroundColor lightgreen -FontColor White
 
-        $webret4 = (Invoke-WebRequest -Uri 'https://karin-bonderer.ch' | Select-Object -ExpandProperty StatusCode)
-        if($webret4 -eq 200){
-            New-UDCounter -Title "Karins Blog" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret4} -Icon linux -BackgroundColor lightgreen -FontColor White
-        }
-        else{
-            New-UDCounter -Title "Karins Blog" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret} -Icon linux -BackgroundColor Red -FontColor White
-        }
+        New-UDCounter -Title "Karins Blog" -AutoRefresh -RefreshInterval 900 -Endpoint {
+            (Invoke-WebRequest -Uri 'https://karin-bonderer.ch' | Select-Object -ExpandProperty StatusCode)
+        } -Icon linux -BackgroundColor lightgreen -FontColor White
 
-        $webret = (Invoke-WebRequest -Uri 'https://dev.cantunada.ch' | Select-Object -ExpandProperty StatusCode)
-        if($webret -eq 200){
-            New-UDCounter -Title "Cantunada" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret} -Icon linux -BackgroundColor lightgreen -FontColor White
-        }
-        else{
-            New-UDCounter -Title "Cantunada" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret4} -Icon linux -BackgroundColor Red -FontColor White
-        }
+        New-UDCounter -Title "Cantunada" -AutoRefresh -RefreshInterval 900 -Endpoint {
+            (Invoke-WebRequest -Uri 'https://dev.cantunada.ch' | Select-Object -ExpandProperty StatusCode)
+        } -Icon linux -BackgroundColor lightgreen -FontColor White
 
-        $webret5 = (Invoke-WebRequest -Uri 'https://beawalther.wordpress.com/' | Select-Object -ExpandProperty StatusCode)
-        if($webret5 -eq 200){
-            New-UDCounter -Title "Steinschmuck" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret5} -Icon linux -BackgroundColor lightgreen -FontColor White
-        }
-        else{
-            New-UDCounter -Title "Steinschmuck" -AutoRefresh -RefreshInterval 900 -Endpoint {$webret5} -Icon linux -BackgroundColor Red -FontColor White
-        }
+        New-UDCounter -Title "Steinschmuck" -AutoRefresh -RefreshInterval 900 -Endpoint {
+            (Invoke-WebRequest -Uri 'https://beawalther.wordpress.com/' | Select-Object -ExpandProperty StatusCode)
+        } -Icon linux -BackgroundColor lightgreen -FontColor White
 
     }  
     #endregion
@@ -140,6 +116,16 @@ $Dashboard = New-UDDashboard -Title "Tinus Dashboard" -Content {
                 ) -Size 'small' -BackgroundColor SteelBlue -FontColor White
             )
         }
+    }
+
+    if($IsWindows){
+        
+        New-UDLayout -Columns 1 -Content {
+            New-UdGrid -Title "Processes" -AutoRefresh 360 -Endpoint {
+                Get-Process | Select-Object Name,ID,WorkingSet,CPU | Sort-Object CPU -Descending | Select-Object -First 20 | Out-UDGridData
+            } -DefaultSortColumn CPU -DefaultSortDescending -BackgroundColor SteelBlue -FontColor White
+        }
+        
     }
     #endregion
 
