@@ -1,3 +1,7 @@
+<#
+https://ironmansoftware.com/universal-dashboard-2-6-beautification-ws-fed-and-bounty-hunters/
+#>
+
 Get-UDDashboard | Stop-UDDashboard
 
 #region Dataset
@@ -29,15 +33,29 @@ $Dashboard = New-UDDashboard -Title "Tinus Dashboard" -Content {
     #>
 
     #region Layout
-    New-UDLayout -Columns 3 -Content {
-        New-UDCounter -Title "github.io" -AutoRefresh -RefreshInterval 900 -Endpoint {
+    New-UDLayout -Columns 6 -Content {
+        New-UDCounter -Title "Tinus EngOps Wiki" -AutoRefresh -RefreshInterval 900 -Endpoint {
             (Invoke-WebRequest -Uri 'https://tinuwalther.github.io' | Select-Object -ExpandProperty StatusCode)
         } -Icon linux -BackgroundColor SteelBlue -FontColor White
+        
         New-UDCounter -Title "Tinus IT Wiki" -AutoRefresh -RefreshInterval 900 -Endpoint {
             (Invoke-WebRequest -Uri 'https://it.martin-walther.ch' | Select-Object -ExpandProperty StatusCode)
         } -Icon linux -BackgroundColor SteelBlue -FontColor White
+        
         New-UDCounter -Title "Foto & IT" -AutoRefresh -RefreshInterval 900 -Endpoint {
             (Invoke-WebRequest -Uri 'https://foto.martin-walther.ch' | Select-Object -ExpandProperty StatusCode)
+        } -Icon linux -BackgroundColor SteelBlue -FontColor White
+        
+        New-UDCounter -Title "Karins Blog" -AutoRefresh -RefreshInterval 900 -Endpoint {
+            (Invoke-WebRequest -Uri 'https://karin-bonderer.ch' | Select-Object -ExpandProperty StatusCode)
+        } -Icon linux -BackgroundColor SteelBlue -FontColor White
+        
+        New-UDCounter -Title "Cantunada" -AutoRefresh -RefreshInterval 900 -Endpoint {
+            (Invoke-WebRequest -Uri 'https://dev.cantunada.ch' | Select-Object -ExpandProperty StatusCode)
+        } -Icon linux -BackgroundColor SteelBlue -FontColor White
+        
+        New-UDCounter -Title "Steinschmuck" -AutoRefresh -RefreshInterval 900 -Endpoint {
+            (Invoke-WebRequest -Uri 'https://beawalther.wordpress.com/' | Select-Object -ExpandProperty StatusCode)
         } -Icon linux -BackgroundColor SteelBlue -FontColor White
     }  
     #endregion
