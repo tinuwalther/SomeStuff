@@ -5,20 +5,14 @@ https://ironmansoftware.com/universal-dashboard-2-6-beautification-ws-fed-and-bo
 Get-UDDashboard | Stop-UDDashboard
 
 #region Dataset
-$out = $null
-Get-ChildItem $HOME | ForEach-Object {
-    $out = $out + "`r`n- " + $_.Name
-}
-$out = $out.TrimStart("`r`n")
-
 $Hotfix = $null
 if($IsWindows){
     $ps = @"
-PowerShell Platform: $($PSVersionTable.Platform)
-PowerShell Edition: $($PSVersionTable.PSEdition)
-PowerShell Version: $($PSVersionTable.PSVersion)
-PowerShell Home: $($PSHome)
-$(($env:PSModulePath) -replace ';',"`r`n")
+    PowerShell Platform: $($PSVersionTable.Platform)
+    PowerShell Edition: $($PSVersionTable.PSEdition)
+    PowerShell Version: $($PSVersionTable.PSVersion)
+    PowerShell Home: $($PSHome)
+    $(($env:PSModulePath) -replace ';',"`r`n")
 "@
 
     $UpdateTitle = "Windows Updates"
@@ -31,16 +25,21 @@ $(($env:PSModulePath) -replace ';',"`r`n")
 }
 elseif($IsMacOS){
     $ps = @"
-PowerShell Platform: $($PSVersionTable.Platform)`r`n
-PowerShell Edition: $($PSVersionTable.PSEdition)`r`n
-PowerShell Version: $($PSVersionTable.PSVersion)`r`n`r`n
-PowerShell Home: $($PSHome)
-
-$(($env:PSModulePath) -replace ':',"`r`n")
+    PowerShell Platform: $($PSVersionTable.Platform)`r`n
+    PowerShell Edition: $($PSVersionTable.PSEdition)`r`n
+    PowerShell Version: $($PSVersionTable.PSVersion)`r`n`
+    PowerShell Home: $($PSHome)`r`n`
+    $(($env:PSModulePath) -replace ':',"`r`n")
 "@
 
     $UpdateTitle = "Mac Updates"
-    $Hotfix = softwareupdate -l
+    #$Hotfix = "not implemented yet"
+    $ret = softwareupdate --history
+    for ($i = 2; $i -le ($ret.GetUpperBound(0)); $i++){
+        $Hotfix = $Hotfix + "`r`n" + $ret[$i].TrimEnd(' ')
+    }
+    $Hotfix = $Hotfix.TrimStart("`r`n")
+
 }
 elseif($IsLinux){
     $UpdateTitle = "Linux Updates"
@@ -118,15 +117,13 @@ $Dashboard = New-UDDashboard -Title "Tinus Dashboard" -Content {
         }
     }
 
-    if($IsWindows){
-        
-        New-UDLayout -Columns 1 -Content {
-            New-UdGrid -Title "Processes" -AutoRefresh 360 -Endpoint {
-                Get-Process | Select-Object Name,ID,WorkingSet,CPU | Sort-Object CPU -Descending | Select-Object -First 20 | Out-UDGridData
-            } -DefaultSortColumn CPU -DefaultSortDescending -BackgroundColor SteelBlue -FontColor White
-        }
-        
+    New-UDLayout -Columns 1 -Content {
+        New-UdGrid -Title "Processes" -AutoRefresh 360 -Endpoint {
+            #https://docs.microsoft.com/de-de/powershell/module/Microsoft.PowerShell.Management/Get-Process?view=powershell-5.1
+            Get-Process -IncludeUserName | Select-Object ProcessName,ID,@{Name = 'WS(KB)'; Expression = {($_.WorkingSet/1kb).ToString("N0")}},@{Name = 'CPU(s)'; Expression = {if ($_.CPU) {$_.CPU.ToString("N0")}}},UserName,Path | Out-UDGridData
+        } -DefaultSortColumn 'WS(KB)' -DefaultSortDescending -BackgroundColor SteelBlue -FontColor White
     }
+        
     #endregion
 
     #region Input
