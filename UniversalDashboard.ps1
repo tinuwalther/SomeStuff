@@ -49,17 +49,48 @@ elseif($IsLinux){
 
 #endregion
 
+#region Cache
+$Schedule = New-UDEndpointSchedule -Every 15 -Minute
+$Endpoint = New-UDEndpoint -Schedule $Schedule -Endpoint {
+    $Cache:WebRequest1 = (Invoke-WebRequest -Uri 'https://tinuwalther.github.io'    | Select-Object @{Name='Status'; Expression = {$_.StatusDescription}},@{Name='LastTest'; Expression = {Get-Date -f 'HH:mm:ss'}})
+    $Cache:WebRequest2 = (Invoke-WebRequest -Uri 'https://it.martin-walther.ch'     | Select-Object @{Name='Status'; Expression = {$_.StatusDescription}},@{Name='LastTest'; Expression = {Get-Date -f 'HH:mm:ss'}})
+    $Cache:WebRequest3 = (Invoke-WebRequest -Uri 'https://foto.martin-walther.ch'   | Select-Object @{Name='Status'; Expression = {$_.StatusDescription}},@{Name='LastTest'; Expression = {Get-Date -f 'HH:mm:ss'}})
+    $Cache:WebRequest4 = (Invoke-WebRequest -Uri 'https://karin-bonderer.ch'        | Select-Object @{Name='Status'; Expression = {$_.StatusDescription}},@{Name='LastTest'; Expression = {Get-Date -f 'HH:mm:ss'}})
+    $Cache:WebRequest5 = (Invoke-WebRequest -Uri 'https://dev.cantunada.ch'         | Select-Object @{Name='Status'; Expression = {$_.StatusDescription}},@{Name='LastTest'; Expression = {Get-Date -f 'HH:mm:ss'}})
+    $Cache:WebRequest6 = (Invoke-WebRequest -Uri 'https://beawalther.wordpress.com' | Select-Object @{Name='Status'; Expression = {$_.StatusDescription}},@{Name='LastTest'; Expression = {Get-Date -f 'HH:mm:ss'}})
+}
+#endregion
+
+#region Dashboard
 $Dashboard = New-UDDashboard -Title "Tinus Dashboard" -Content {
 
-    <#
-    New-UDButton -Text "Get-Date!" -OnClick {
-        Show-UDToast -Message (Get-Date)
+    New-UDLayout -Columns 6 -Content {
+
+        New-UDGrid -Title 'EngOps Wiki' -AutoRefresh -RefreshInterval 900 -Endpoint {
+            $Cache:WebRequest1 | Out-UDGridData
+        } -BackgroundColor SteelBlue -FontColor White -NoFilter -NoExport
+
+        New-UDGrid -Title 'Tinus IT Wiki' -AutoRefresh -RefreshInterval 900 -Endpoint {
+            $Cache:WebRequest2 | Out-UDGridData
+        } -BackgroundColor SteelBlue -FontColor White -NoFilter -NoExport
+
+        New-UDGrid -Title 'Foto & IT' -AutoRefresh -RefreshInterval 900 -Endpoint {
+            $Cache:WebRequest3 | Out-UDGridData
+        } -BackgroundColor SteelBlue -FontColor White -NoFilter -NoExport
+
+        New-UDGrid -Title 'Karins Blog' -AutoRefresh -RefreshInterval 900 -Endpoint {
+            $Cache:WebRequest4 | Out-UDGridData
+        } -BackgroundColor SteelBlue -FontColor White -NoFilter -NoExport
+
+        New-UDGrid -Title 'Cantunada' -AutoRefresh -RefreshInterval 900 -Endpoint {
+            $Cache:WebRequest5 | Out-UDGridData
+        } -BackgroundColor SteelBlue -FontColor White -NoFilter -NoExport
+
+        New-UDGrid -Title 'Steinschmuck' -AutoRefresh -RefreshInterval 900 -Endpoint {
+            $Cache:WebRequest6 | Out-UDGridData
+        } -BackgroundColor SteelBlue -FontColor White -NoFilter -NoExport
+
     }
-    New-UDButton -Text "Test Foto" -Icon cloud -IconAlignment left -OnClick {
-        Show-UDToast -Message (Invoke-WebRequest -Uri 'https://foto.martin-walther.ch' | Select-Object -ExpandProperty StatusDescription)
-    }
-    New-UDButton -Text "Button" -Icon cloud -IconAlignment right
-    #>
 
     #region Layout
     New-UDLayout -Columns 6 -Content {
@@ -151,5 +182,6 @@ $Dashboard = New-UDDashboard -Title "Tinus Dashboard" -Content {
     }
     #endregion
 }
+#endregion
 
-Start-UDDashboard -Dashboard $Dashboard -Port 10001 -AutoReload
+Start-UDDashboard -Endpoint $Endpoint -Dashboard $Dashboard -Port 10001 -AutoReload
