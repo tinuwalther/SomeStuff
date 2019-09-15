@@ -33,7 +33,8 @@ elseif($IsMacOS){
 "@
 
     $UpdateTitle = "Mac Updates"
-    #$Hotfix = "not implemented yet"
+    $WebSiteName = 'Apple security updates'
+    $WebSiteUrl  = 'https://support.apple.com/en-us/HT201222'
     $ret = softwareupdate --history
     for ($i = 2; $i -le ($ret.GetUpperBound(0)); $i++){
         $Hotfix = $Hotfix + "`r`n" + $ret[$i].TrimEnd(' ')
@@ -118,11 +119,17 @@ $Dashboard = New-UDDashboard -Title "Tinus Dashboard" -Content {
     }
 
     New-UDLayout -Columns 1 -Content {
+        <#
         New-UdGrid -Title "Processes" -AutoRefresh 360 -Endpoint {
             #https://docs.microsoft.com/de-de/powershell/module/Microsoft.PowerShell.Management/Get-Process?view=powershell-5.1
             Get-Process -IncludeUserName | Select-Object ProcessName,ID,@{Name = 'WS(KB)'; Expression = {($_.WorkingSet/1kb).ToString("N0")}},@{Name = 'CPU(s)'; Expression = {if ($_.CPU) {$_.CPU.ToString("N0")}}},UserName,Path | Out-UDGridData
         } -DefaultSortColumn 'WS(KB)' -DefaultSortDescending -BackgroundColor SteelBlue -FontColor White
-    }
+        #>
+        
+        New-UdGrid -Title "Processes" -AutoRefresh 360 -Endpoint {
+            Get-Process -IncludeUserName | Select-Object ProcessName,ID,WorkingSet,CPU,UserName,Path | Out-UDGridData
+        } -DefaultSortColumn CPU -DefaultSortDescending -BackgroundColor SteelBlue -FontColor White
+   }
         
     #endregion
 
