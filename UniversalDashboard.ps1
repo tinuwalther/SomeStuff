@@ -2,89 +2,27 @@
 https://ironmansoftware.com/universal-dashboard-2-6-beautification-ws-fed-and-bounty-hunters/
 #>
 
+Get-UDDashboard | Stop-UDDashboard
+
 if($PSVersionTable.PSVersion.Major -lt 6){
     $IsWindows = $true
 }
 
-Get-UDDashboard | Stop-UDDashboard
-
 #region Dataset
-$Hotfix = $null
 if($IsWindows){
-    $ps = @"
-    PowerShell Platform: $($PSVersionTable.Platform)
-    PowerShell Edition: $($PSVersionTable.PSEdition)
-    PowerShell Version: $($PSVersionTable.PSVersion)
-    PowerShell Home: $($PSHome)
-    $(($env:PSModulePath) -replace ';',"`r`n")
-"@
-
     $UpdateTitle = "Windows Updates"
     $WebSiteName = 'Microsoft Update Cataloge'
     $WebSiteUrl  = 'https://www.catalog.update.microsoft.com/Home.aspx'
-    Get-CimInstance -Class Win32_QuickFixEngineering | Sort-Object InstalledOn -Descending | Select-Object -First 8| ForEach-Object {
-        $Hotfix = $Hotfix + "`r`n$($_.HotFixID) installed at $(Get-Date ($_.InstalledOn) -f 'dddd dd MMMM yyyy')"
-    }
-    $Hotfix = $Hotfix.TrimStart("`r`n")
 }
 elseif($IsMacOS){
-    $ps = @"
-    PowerShell Platform: $($PSVersionTable.Platform)`r`n
-    PowerShell Edition: $($PSVersionTable.PSEdition)`r`n
-    PowerShell Version: $($PSVersionTable.PSVersion)`r`n`
-    PowerShell Home: $($PSHome)`r`n`
-    $(($env:PSModulePath) -replace ':',"`r`n")
-"@
-
     $UpdateTitle = "Mac Updates"
     $WebSiteName = 'Apple security updates'
     $WebSiteUrl  = 'https://support.apple.com/en-us/HT201222'
-    $ret = softwareupdate --history
-
-    for ($i = 2; $i -le 8; $i++){
-        $Hotfix = $Hotfix + "`r`n" + $ret[$i].TrimEnd(' ')
-    }
-    $Hotfix = $Hotfix.TrimStart("`r`n")
-
-    <#
-    $Hotfix  = @()
-    for ($i = 2; $i -le 8; $i++){
-        $ret[$i] | ForEach-Object {
-            $string = $_ -split '\s+'
-            if($string.GetUpperBound(0) -lt 6) {
-                $obj = [PSCustomObject]@{
-                    Name      = $string[0]
-                    Version   = $string[1]
-                    Installed = "$($string[2]) $($string[3])"
-                }
-                $Hotfix += $obj
-            }
-            elseif($string.GetUpperBound(0) -eq 6) {
-                $obj = [PSCustomObject]@{
-                    Name      = "$($string[0]) $($string[1]) $($string[2])"
-                    Version   = $string[3]
-                    Installed = "$($string[4]) $($string[5])"
-                }
-                $Hotfix += $obj
-            }
-            elseif($string.GetUpperBound(0) -eq 7) {
-                $obj = [PSCustomObject]@{
-                    Name      = "$($string[0]) $($string[0]) $($string[1]) $($string[2]) $($string[3]) $($string[4])"
-                    Version   = ''
-                    Installed = "$($string[5]) $($string[6])"
-                }
-                $Hotfix += $obj
-            }
-        }
-    }
-    #>
-
 }
 elseif($IsLinux){
     $UpdateTitle = "Linux Updates"
     $Hotfix = "not implemented yet"
 }
-
 #endregion
 
 #region Cache
@@ -102,30 +40,37 @@ $Endpoint = New-UDEndpoint -Schedule $Schedule -Endpoint {
 #endregion
 
 $Page1 = New-UDPage -Name "PowerShell" -Title "Tinus Dashboard" -Content {
-
+    
     New-UDLayout -Columns 1 -Content {  
-
+        
         New-UDTable -Title "Server Information" -Headers @(" ", " ") -Endpoint {
-            @{
-               'Computer Name'       = hostname
-               #'Operating System'    = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
-               'PowerShell Platform' = $PSVersionTable.Platform
-               'PowerShell Edition'  = $PSVersionTable.PSEdition
-               'PowerShell Version'  = $PSVersionTable.PSVersion.ToString()
-               'PowerShell Home'     = $PSHome
-               'PowerShell Path'     = $(($env:PSModulePath) -replace ';',"`r`n")
-            }.GetEnumerator() | Out-UDTableData -Property @("Name", "Value") 
-        } -AutoRefresh -RefreshInterval 30 -Links @( New-UDLink -Text 'Tinus EngOps Wiki' -Url 'https://tinuwalther.github.io/') -BackgroundColor SteelBlue -FontColor White
 
-        <#
-        New-UDCard  -Title 'Installed PowerShell' -Text $ps -Links @(
-            New-UDLink -Text 'Tinus EngOps Wiki' -Url 'https://tinuwalther.github.io/'
-        ) -Size 'small' -BackgroundColor SteelBlue -FontColor White
-        #>
+            if($IsWindows){
+                $datahash = [ordered] @{
+                    'Computer Name'       = $env:COMPUTERNAME
+                    'Operating System'    = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
+                    'PowerShell Platform' = $PSVersionTable.Platform
+                    'PowerShell Edition'  = $PSVersionTable.PSEdition
+                    'PowerShell Version'  = $PSVersionTable.PSVersion.ToString()
+                    'PowerShell Home'     = $PSHome
+                    'PowerShell Path'     = $(($env:PSModulePath).Replace(';',' - '))
+                }
+            }
+            elseif($IsMacOS){
+                $datahash = [ordered] @{
+                    'Computer Name'       = hostname
+                    #'Operating System'    = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
+                    'PowerShell Platform' = $PSVersionTable.Platform
+                    'PowerShell Edition'  = $PSVersionTable.PSEdition
+                    'PowerShell Version'  = $PSVersionTable.PSVersion.ToString()
+                    'PowerShell Home'     = $PSHome
+                    'PowerShell Path'     = $(($env:PSModulePath) -replace ':',", ")
+                }
+            }
+    
+            $datahash.GetEnumerator() | Out-UDTableData -Property @("Name", "Value")
+        } -Links @( New-UDLink -Text 'Tinus EngOps Wiki' -Url 'https://tinuwalther.github.io/') -BackgroundColor SteelBlue -FontColor White
 
-        New-UDCard -Title $UpdateTitle -Text $Hotfix -Links @(
-            New-UDLink -Text $WebSiteName -Url $WebSiteUrl
-        ) -Size 'small' -BackgroundColor SteelBlue -FontColor White
     }
 
     New-UDLayout -Columns 1 -Content {
@@ -145,7 +90,56 @@ $Page1 = New-UDPage -Name "PowerShell" -Title "Tinus Dashboard" -Content {
 
 }
 
-$Page2 = New-UDPage -Name "Process Infos" -Title "Tinus Dashboard" -Content { 
+$Page2 = New-UDPage -Name "OS Updates" -Title "Tinus Dashboard" -Content {
+    
+    New-UDLayout -Columns 1 -Content {  
+
+        New-UdGrid -Title $UpdateTitle -Endpoint {
+            if($IsWindows){
+                $Hotfix = $null
+                $Hotfix = Get-CimInstance -Class Win32_QuickFixEngineering | Sort-Object InstalledOn -Descending | Select-Object HotFixID,Description,InstalledOn
+            }
+            elseif($IsMacOS){
+                $ret = softwareupdate --history
+                $Hotfix  = @()
+                for ($i = 2; $i -le 8; $i++){
+                    $ret[$i] | ForEach-Object {
+                        $string = $_ -split '\s+'
+                        if($string.GetUpperBound(0) -lt 6) {
+                            $obj = [PSCustomObject]@{
+                                Name      = $string[0]
+                                Version   = $string[1]
+                                InstalledOn = "$($string[2]) $($string[3])"
+                            }
+                            $Hotfix += $obj
+                        }
+                        elseif($string.GetUpperBound(0) -eq 6) {
+                            $obj = [PSCustomObject]@{
+                                Name      = "$($string[0]) $($string[1]) $($string[2])"
+                                Version   = $string[3]
+                                InstalledOn = "$($string[4]) $($string[5])"
+                            }
+                            $Hotfix += $obj
+                        }
+                        elseif($string.GetUpperBound(0) -eq 7) {
+                            $obj = [PSCustomObject]@{
+                                Name      = "$($string[0]) $($string[0]) $($string[1]) $($string[2]) $($string[3]) $($string[4])"
+                                Version   = ''
+                                InstalledOn = "$($string[5]) $($string[6])"
+                            }
+                            $Hotfix += $obj
+                        }
+                    }
+                }
+            }
+            $Hotfix | Out-UDGridData
+        } -Links @(New-UDLink -Text $WebSiteName -Url $WebSiteUrl) -DefaultSortColumn InstalledOn -DefaultSortDescending -BackgroundColor SteelBlue -FontColor White
+
+    }
+
+}
+
+$Page3 = New-UDPage -Name "Process Infos" -Title "Tinus Dashboard" -Content { 
 
     New-UDLayout -Columns 1 -Content {
         <#
@@ -162,7 +156,7 @@ $Page2 = New-UDPage -Name "Process Infos" -Title "Tinus Dashboard" -Content {
 
 }
 
-$Page3 = New-UDPage -Name "Web Tester" -Title "Tinus Dashboard" -Content { 
+$Page4 = New-UDPage -Name "Web Tester" -Title "Tinus Dashboard" -Content { 
 
     New-UDLayout -Columns 6 -Content {
 
@@ -244,6 +238,6 @@ $Page3 = New-UDPage -Name "Web Tester" -Title "Tinus Dashboard" -Content {
 
 
 #region Dashboard
-$Dashboard = New-UDDashboard -Pages @($Page1, $Page2, $Page3)
+$Dashboard = New-UDDashboard -Pages @($Page1, $Page2, $Page3, $Page4)
 
 Start-UDDashboard -Endpoint $Endpoint -Dashboard $Dashboard -Port 10001 -AutoReload
