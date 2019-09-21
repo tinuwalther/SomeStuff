@@ -40,10 +40,44 @@ elseif($IsMacOS){
     $WebSiteName = 'Apple security updates'
     $WebSiteUrl  = 'https://support.apple.com/en-us/HT201222'
     $ret = softwareupdate --history
+
     for ($i = 2; $i -le 8; $i++){
         $Hotfix = $Hotfix + "`r`n" + $ret[$i].TrimEnd(' ')
     }
     $Hotfix = $Hotfix.TrimStart("`r`n")
+
+    <#
+    $Hotfix  = @()
+    for ($i = 2; $i -le 8; $i++){
+        $ret[$i] | ForEach-Object {
+            $string = $_ -split '\s+'
+            if($string.GetUpperBound(0) -lt 6) {
+                $obj = [PSCustomObject]@{
+                    Name      = $string[0]
+                    Version   = $string[1]
+                    Installed = "$($string[2]) $($string[3])"
+                }
+                $Hotfix += $obj
+            }
+            elseif($string.GetUpperBound(0) -eq 6) {
+                $obj = [PSCustomObject]@{
+                    Name      = "$($string[0]) $($string[1]) $($string[2])"
+                    Version   = $string[3]
+                    Installed = "$($string[4]) $($string[5])"
+                }
+                $Hotfix += $obj
+            }
+            elseif($string.GetUpperBound(0) -eq 7) {
+                $obj = [PSCustomObject]@{
+                    Name      = "$($string[0]) $($string[0]) $($string[1]) $($string[2]) $($string[3]) $($string[4])"
+                    Version   = ''
+                    Installed = "$($string[5]) $($string[6])"
+                }
+                $Hotfix += $obj
+            }
+        }
+    }
+    #>
 
 }
 elseif($IsLinux){
@@ -73,8 +107,8 @@ $Page1 = New-UDPage -Name "PowerShell" -Title "Tinus Dashboard" -Content {
 
         New-UDTable -Title "Server Information" -Headers @(" ", " ") -Endpoint {
             @{
-               'Computer Name'       = $env:COMPUTERNAME
-               'Operating System'    = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
+               'Computer Name'       = hostname
+               #'Operating System'    = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
                'PowerShell Platform' = $PSVersionTable.Platform
                'PowerShell Edition'  = $PSVersionTable.PSEdition
                'PowerShell Version'  = $PSVersionTable.PSVersion.ToString()
@@ -92,7 +126,6 @@ $Page1 = New-UDPage -Name "PowerShell" -Title "Tinus Dashboard" -Content {
         New-UDCard -Title $UpdateTitle -Text $Hotfix -Links @(
             New-UDLink -Text $WebSiteName -Url $WebSiteUrl
         ) -Size 'small' -BackgroundColor SteelBlue -FontColor White
-
     }
 
     New-UDLayout -Columns 1 -Content {
