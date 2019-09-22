@@ -46,9 +46,10 @@ $Page1 = New-UDPage -Name "PowerShell" -Title "Tinus Dashboard" -Content {
         New-UDTable -Title "Server Information" -Headers @(" ", " ") -Endpoint {
 
             if($IsWindows){
+                $OsSystem    = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
                 $datahash = [ordered] @{
                     'Computer Name'       = $env:COMPUTERNAME
-                    'Operating System'    = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
+                    'Operating System'    = $OsSystem
                     'PowerShell Platform' = $PSVersionTable.Platform
                     'PowerShell Edition'  = $PSVersionTable.PSEdition
                     'PowerShell Version'  = $PSVersionTable.PSVersion.ToString()
@@ -57,9 +58,10 @@ $Page1 = New-UDPage -Name "PowerShell" -Title "Tinus Dashboard" -Content {
                 }
             }
             elseif($IsMacOS){
+                $OsSystem    = (system_profiler SPSoftwareDataType | Select-String -pattern 'System Version') -replace '\s'
                 $datahash = [ordered] @{
                     'Computer Name'       = hostname
-                    #'Operating System'    = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
+                    'Operating System'    = $OsSystem
                     'PowerShell Platform' = $PSVersionTable.Platform
                     'PowerShell Edition'  = $PSVersionTable.PSEdition
                     'PowerShell Version'  = $PSVersionTable.PSVersion.ToString()
@@ -102,14 +104,15 @@ $Page2 = New-UDPage -Name "OS Updates" -Title "Tinus Dashboard" -Content {
             elseif($IsMacOS){
                 $ret = softwareupdate --history
                 $Hotfix  = @()
-                for ($i = 2; $i -le 8; $i++){
+                for ($i = 2; $i -le $ret.GetUpperBound(0); $i++){
                     $ret[$i] | ForEach-Object {
                         $string = $_ -split '\s+'
+                        $Installed = Get-Date "$($string[$string.GetUpperBound(0)-2]) $($string[$string.GetUpperBound(0)-1])" -Format 'yyyy-MM-dd HH:mm:ss'
                         if($string.GetUpperBound(0) -lt 6) {
                             $obj = [PSCustomObject]@{
                                 Name      = $string[0]
                                 Version   = $string[1]
-                                InstalledOn = "$($string[2]) $($string[3])"
+                                InstalledOn = $Installed
                             }
                             $Hotfix += $obj
                         }
@@ -117,15 +120,15 @@ $Page2 = New-UDPage -Name "OS Updates" -Title "Tinus Dashboard" -Content {
                             $obj = [PSCustomObject]@{
                                 Name      = "$($string[0]) $($string[1]) $($string[2])"
                                 Version   = $string[3]
-                                InstalledOn = "$($string[4]) $($string[5])"
+                                InstalledOn = $Installed
                             }
                             $Hotfix += $obj
                         }
                         elseif($string.GetUpperBound(0) -eq 7) {
                             $obj = [PSCustomObject]@{
-                                Name      = "$($string[0]) $($string[0]) $($string[1]) $($string[2]) $($string[3]) $($string[4])"
+                                Name      = "$($string[0]) $($string[1]) $($string[2]) $($string[3]) $($string[4])"
                                 Version   = ''
-                                InstalledOn = "$($string[5]) $($string[6])"
+                                InstalledOn = $Installed
                             }
                             $Hotfix += $obj
                         }
