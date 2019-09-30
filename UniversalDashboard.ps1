@@ -48,27 +48,29 @@ $Page1 = New-UDPage -Name "PowerShell" -Title "Tinus Dashboard" -Content {
         New-UDTable -Title "Server Information" -Headers @(" ", " ") -Endpoint {
 
             if($IsWindows){
-                $OsSystem    = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
+                $OsSystem = (Get-CimInstance -ClassName Win32_OperatingSystem).Caption
+                $PoshPath = $(($env:PSModulePath).Replace(';',' - '))
                 $datahash = [ordered] @{
-                    'Computer Name'       = $env:COMPUTERNAME
-                    'Operating System'    = $OsSystem
-                    'PowerShell Platform' = $PSVersionTable.Platform
-                    'PowerShell Edition'  = $PSVersionTable.PSEdition
-                    'PowerShell Version'  = $PSVersionTable.PSVersion.ToString()
-                    'PowerShell Home'     = $PSHome
-                    'PowerShell Path'     = $(($env:PSModulePath).Replace(';',' - '))
+                    'Computer Name'         = $env:COMPUTERNAME
+                    'Operating System'      = $OsSystem
+                    'PowerShell Platform'   = $PSVersionTable.Platform
+                    'PowerShell Edition'    = $PSVersionTable.PSEdition
+                    'PowerShell Version'    = $PSVersionTable.PSVersion.ToString()
+                    'PowerShell Home'       = $PSHome
+                    'PowerShell ModulePath' = $PoshPath
                 }
             }
             elseif($IsMacOS){
-                $OsSystem    = (system_profiler SPSoftwareDataType | Select-String -pattern 'System Version') -replace '\s'
+                $OsSystem = (system_profiler SPSoftwareDataType | Select-String -pattern '\w+\s\d{1,2}\.\d{1,2}\.\d{1,2}\s\(\d{1,2}\w+\)' -AllMatches | Select-Object -ExpandProperty matches | Select-Object -ExpandProperty value)
+                $PoshPath = $(($env:PSModulePath).Replace(':',' - '))
                 $datahash = [ordered] @{
-                    'Computer Name'       = hostname
-                    'Operating System'    = $OsSystem
-                    'PowerShell Platform' = $PSVersionTable.Platform
-                    'PowerShell Edition'  = $PSVersionTable.PSEdition
-                    'PowerShell Version'  = $PSVersionTable.PSVersion.ToString()
-                    'PowerShell Home'     = $PSHome
-                    'PowerShell Path'     = $(($env:PSModulePath) -replace ':'," - ")
+                    'Computer Name'         = hostname
+                    'Operating System'      = $OsSystem
+                    'PowerShell Platform'   = $PSVersionTable.Platform
+                    'PowerShell Edition'    = $PSVersionTable.PSEdition
+                    'PowerShell Version'    = $PSVersionTable.PSVersion.ToString()
+                    'PowerShell Home'       = $PSHome
+                    'PowerShell ModulePath' = $PoshPath
                 }
             }
     
