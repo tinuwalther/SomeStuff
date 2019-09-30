@@ -300,7 +300,47 @@ $($WebSiteURI.RawContent | Select-String -Pattern 'Date:\s\D+\d+\D+\d+\s\d+\:\d+
 }
 #endregion
 
+#region "DNS Tester"
+$Page5 = New-UDPage -Name "DNS Tester" -Title "Tinus Dashboard" -Content { 
+
+    New-UDLayout -Columns 2 -Content {
+
+        New-UDInput -Title "Forward lookup test" -Endpoint {
+            param($Hostname) 
+            # Get a module from the gallery
+            $Result = [System.Net.Dns]::GetHostByName($Hostname)
+$CardOutput = @"
+HostName: $($Result.HostName.ToString())
+Aliases: $($Result.Aliases)
+AddressList: $($Result.AddressList)
+"@
+            # Output a new card based on that info
+            New-UDInputAction -Content @(
+                New-UDCard -Title "Forward lookup $Hostname" -Text $CardOutput -Size 'small' -BackgroundColor SteelBlue -FontColor White
+            )
+        }
+
+        New-UDInput -Title "Reverse lookup test" -Endpoint {
+            param($IPAddress) 
+            # Get a module from the gallery
+            $Result = [System.Net.Dns]::GetHostByAddress($IPAddress)
+$CardOutput = @"
+HostName: $($Result.HostName.ToString())
+Aliases: $($Result.Aliases)
+AddressList: $($Result.AddressList)
+"@
+            # Output a new card based on that info
+            New-UDInputAction -Content @(
+                New-UDCard -Title "Reverse lookup $IPAddress" -Text $CardOutput -Size 'small' -BackgroundColor SteelBlue -FontColor White
+            )
+        }
+
+    }
+
+}
+#endregion
+
 #region Dashboard
-$Dashboard = New-UDDashboard -Pages @($Page1, $Page2, $Page3, $Page4)
+$Dashboard = New-UDDashboard -Pages @($Page1, $Page2, $Page3, $Page4, $Page5)
 
 Start-UDDashboard -Endpoint $Endpoint -Dashboard $Dashboard -Port 10001 -AutoReload
