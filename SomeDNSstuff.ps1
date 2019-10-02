@@ -1,17 +1,22 @@
+if($IsWindows){
+    $psCredentials   = Get-Credential -Message 'Enter your credentials'
+    $strComputerName = 'BigServer'
+            
+    $cims = New-CimSession -ComputerName $strComputerName -Credential $psCredentials -Authentication Negotiate
 
-$psCredentials   = Get-Credential -Message 'Enter your credentials'
-$strComputerName = 'BigServer'
+    $aryDNSSuffixes = @((Get-DnsClientGlobalSetting -CimSession $cims).SuffixSearchList)
+    $aryDNSSuffixes += 'whatever.local'
 
-$aryDNSSuffixes  = 
-
-Invoke-WmiMethod -Class win32_networkadapterconfiguration -Name setDNSSuffixSearchOrder -Credential $psCredentials -ComputerName $strComputerName -ArgumentList @($aryDNSSuffixes), $null
-
-$nics = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()
-foreach($adapter in $nics){
-    $adapter.GetIPProperties()
+    Set-DnsClientGlobalSetting -SuffixSearchList $aryDNSSuffixes -CimSession $cims
 }
 
+if($IsMacOS){
+    scutil --dns | Select-String -Pattern 'search domain'
+    Get-Content -Path '/etc/resolv.conf' | Select-String -Pattern 'search'
+}
 
-$cims = New-CimSession -ComputerName Server01 -Credential $cred -Authentication Negotiate
-Get-DnsClientGlobalSetting -CimSession $cims
-Set-DnsClientGlobalSetting -SuffixSearchList @("corp.contoso.com", "na.corp.contoso.com") -CimSession $cims
+if($IsLinux){
+    Get-Content -Path '/etc/sysconfig/network-scripts/ifcfg-eth0'
+    Get-Content -Path '/etc/resolv.conf'
+    #DOMAIN="domain.com sub.domain.com"
+}
