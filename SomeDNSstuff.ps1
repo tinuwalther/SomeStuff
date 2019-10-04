@@ -12,7 +12,7 @@ if($IsWindows){
 
 if($IsMacOS){
     scutil --dns | Select-String -Pattern 'search domain'
-    Get-Content -Path '/etc/resolv.conf' | Select-String -Pattern 'search'
+    (Get-Content -Path '/etc/resolv.conf' | Select-String -Pattern 'search\s\S+') -replace 'search\s'
 }
 
 if($IsLinux){
