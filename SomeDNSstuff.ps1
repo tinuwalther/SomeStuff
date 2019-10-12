@@ -16,7 +16,9 @@ if($IsMacOS){
 }
 
 if($IsLinux){
-    Get-Content -Path '/etc/sysconfig/network-scripts/ifcfg-eth0'
+    #Get-Content -Path '/etc/sysconfig/network-scripts/ifcfg-eth0'
+    Set-Content -Path '/etc/sysconfig/network' -Value 'DOMAIN="test.local"' -PassThru
     Get-Content -Path '/etc/resolv.conf'
     #DOMAIN="domain.com sub.domain.com"
+    sudo restart network-manager
 }
