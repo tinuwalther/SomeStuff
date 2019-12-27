@@ -6,7 +6,7 @@
    Test unreaded MailMesssage for non-swisscom-sender and http-links
 
 .NOTES
-   SenderEmailType: SMTP von extern, EX von Exchange intern
+   Outlook must be running
 
 .EXAMPLE
    Test-SuspectedMailMesssage
@@ -14,6 +14,20 @@
 #>
 
 function Test-SuspectedMailMesssage{
+    <#
+    .Synopsis
+    Test-SuspectedMailMesssage
+
+    .DESCRIPTION
+    Test unreaded MailMesssage for non-swisscom-sender and http-links
+
+    .NOTES
+    SenderEmailType: SMTP von extern, EX von Exchange intern
+
+    .EXAMPLE
+    Test-SuspectedMailMesssage
+
+    #>
     [CmdletBinding()]
     Param()
 
@@ -70,21 +84,21 @@ function Test-SuspectedMailMesssage{
     }
 }
 
-<#
-.Synopsis
-   Show-BalloonTip
-
-.DESCRIPTION
-   Show-BalloonTip
-
-.NOTES
-   Example of how to use this cmdlet
-
-.EXAMPLE
-   Show-BalloonTip -SuspectedMailMesssage [PSCustomObject]@{SenderName,SenderEmailAddress,ReceivedTime,FoundHttpBody}
-
-#>
 function Show-BalloonTip{
+    <#
+    .Synopsis
+    Show-BalloonTip
+
+    .DESCRIPTION
+    Show-BalloonTip
+
+    .NOTES
+    Example of how to use this cmdlet
+
+    .EXAMPLE
+    Show-BalloonTip -SuspectedMailMesssage [PSCustomObject]@{SenderName,SenderEmailAddress,ReceivedTime,FoundHttpBody}
+
+    #>
     [CmdletBinding()]
     Param
     (
@@ -104,17 +118,16 @@ function Show-BalloonTip{
     {    
         $SuspectedMailMesssage | ForEach-Object{
             $BalloonText = "Mail from <$($_.SenderName)> <$($_.SenderEmailAddress)> at <$($_.ReceivedTime)> contains <$($_.FoundHttpBody)>"
+            $balloon.Icon            = [System.Drawing.Icon]::ExtractAssociatedIcon($path) 
+            $balloon.BalloonTipIcon  = [System.Windows.Forms.ToolTipIcon]::Warning 
+            $balloon.BalloonTipText  = $BalloonText
+            $balloon.BalloonTipTitle = "Attention suspected Mail detected!"
+            $balloon.Visible         = $true 
+            $balloon.ShowBalloonTip(5000)
         }
-        $balloon.Icon            = [System.Drawing.Icon]::ExtractAssociatedIcon($path) 
-        $balloon.BalloonTipIcon  = [System.Windows.Forms.ToolTipIcon]::Warning 
-        $balloon.BalloonTipText  = $BalloonText
-        $balloon.BalloonTipTitle = "Attention suspected Mail detected!"
-    
     }
     End
     {
-        $balloon.Visible = $true 
-        $balloon.ShowBalloonTip(5000)
     }
 }
 

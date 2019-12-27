@@ -22,3 +22,17 @@ if($IsLinux){
     #DOMAIN="domain.com sub.domain.com"
     sudo restart network-manager
 }
+
+Get-PsNetAdapters | Where-Object OperationalStatus -eq 'Up' | ForEach {
+
+    Get-PsNetAdapterConfiguration | Where-Object Index -eq $_.Index | ForEach {
+        $_
+        Test-PsNetDig -Destination $_.IpV4Addresses
+    }
+
+}
+
+Get-DnsClient
+Get-DnsClientCache
+Get-DnsClientGlobalSetting
+Get-PsNetDnsSearchSuffix
