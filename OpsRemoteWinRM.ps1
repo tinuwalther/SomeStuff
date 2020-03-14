@@ -104,7 +104,7 @@ $Page2 = New-UDPage -Name "Connectivity Tester" -Title "Connectivity Tester - $(
 
                     New-UDCard -Title "Details" -Text $CardOutput -Links @(
                             New-UDLink -Text "$ret"
-                    ) -Size 'small' -BackgroundColor $color -FontColor White
+                    ) -BackgroundColor $color -FontColor White
 
                 )
 
@@ -117,7 +117,7 @@ $Page2 = New-UDPage -Name "Connectivity Tester" -Title "Connectivity Tester - $(
 }
 #endregion
 
-#region "ScriptBlock Tester"
+#region "Access Tester"
 $Page6 = New-UDPage -Name "Access Tester" -Title "Access Tester - $($UDTitle)" -Content { 
 
     New-UDLayout -Columns 1 -Content {
@@ -159,7 +159,7 @@ $Page6 = New-UDPage -Name "Access Tester" -Title "Access Tester - $($UDTitle)" -
 
                     New-UDCard -Title "Details" -Text $TestReturn -Links @(
                             #New-UDLink -Text "$ret"
-                    ) -Size 'small' -BackgroundColor $color -FontColor White
+                    ) -BackgroundColor $color -FontColor White
 
                 )
 
@@ -200,29 +200,35 @@ $Page3 = New-UDPage -Name "Windows Updates Tester" -Title "Windows Updates Teste
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
                 # Output a new card based on that info
-                $TestReturn = Test-NetConnection -ComputerName $Remotehost -Port $Remoteport -WarningAction SilentlyContinue
-                
-                $CardOutput = @"
-                ComputerName           : $($TestReturn.ComputerName)
-                RemoteAddress          : $($TestReturn.RemoteAddress)
-                RemotePort             : $($TestReturn.RemotePort)
-                InterfaceAlias         : $($TestReturn.InterfaceAlias)
-                PingSucceeded          : $($TestReturn.PingSucceeded)
-                TcpTestSucceeded       : $($TestReturn.TcpTestSucceeded)
-"@
+
+                $CardOutput = (Get-itemProperty 'HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate' -Name 'WUServer' -ErrorAction SilentlyContinue).WUServer
+
+                Get-HotFix | Sort-Object InstalledOn | Select-Object -Last 5 | Select-Object HotFixID,InstalledOn,Description | Sort-Object InstalledOn -Descending | ForEach-Object {
+                    if([String]::IsNullOrEmpty($CardOutput)){
+                        $CardOutput = "$($_.InstalledOn) installed $($_.HotFixID) $($_.Description)"
+                    }else{
+                        $CardOutput = "$CardOutput`r`n$($_.InstalledOn) installed $($_.HotFixID) $($_.Description)"
+                    }
+                }
+
+                $CardOutput = "$CardOutput`r`n`r`nWindows Update Eventlog:"
+
+                Get-WinEvent -MaxEvents 15 -FilterHashtable @{
+                    Logname   = 'Microsoft-Windows-WindowsUpdateClient/Operational'
+                    StartTime = (get-date).AddDays(-5)
+                    EndTime   = get-date
+                } -ErrorAction SilentlyContinue | ForEach-Object {
+                    if([String]::IsNullOrEmpty($CardOutput)){
+                        $CardOutput = "$($_.TimeCreated) $($_.Id) $($_.Message)"
+                    }else{
+                        $CardOutput = "$CardOutput`r`n$($_.TimeCreated) $($_.Id) $($_.Message)"
+                    }
+                }
                 New-UDInputAction -Content @(
 
-                    if($TestReturn.TcpTestSucceeded){
-                        $ret   = "Connectivity over $Remoteport is OK"
-                        $color = "LightGreen"
-                    }else{
-                        $ret   = "Connectivity over $Remoteport is not OK"
-                        $color = "IndianRed"
-                    }
-
                     New-UDCard -Title "Details" -Text $CardOutput -Links @(
-                            New-UDLink -Text "$ret"
-                    ) -Size 'small' -BackgroundColor $color -FontColor White
+                        New-UDLink -Text 'Microsoft Update-Catalog' -Url 'https://www.catalog.update.microsoft.com/Home.aspx'
+                    )
 
                 )
 
