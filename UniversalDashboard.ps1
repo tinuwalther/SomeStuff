@@ -1,8 +1,12 @@
 <#
-https://ironmansoftware.com/universal-dashboard-2-6-beautification-ws-fed-and-bounty-hunters/
+
+    https://ironmansoftware.com/universal-dashboard-2-6-beautification-ws-fed-and-bounty-hunters/
+
+    localhost:10001
+
 #>
 
-Get-UDDashboard | Stop-UDDashboard
+Get-UDDashboard -Name "Tinus Dashboard" | Stop-UDDashboard
 
 if($PSVersionTable.PSVersion.Major -lt 6){
     $IsWindows = $true
@@ -275,7 +279,7 @@ $Page4 = New-UDPage -Name "Web Tester" -Title "Tinus Dashboard" -Content {
 
             # Get a module from the gallery
             [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Tls11,Tls12'
-            $WebSiteURI = Invoke-WebRequest -TimeoutSec 20 -Uri "https://$($WebSiteName)"
+            $WebSiteURI = Invoke-WebRequest -TimeoutSec 20 -Uri "$($WebSiteName)"
 $CardOutput = @"
 $($WebSiteName) returned:
 
@@ -289,7 +293,7 @@ $($WebSiteURI.RawContent | Select-String -Pattern 'Date:\s\D+\d+\D+\d+\s\d+\:\d+
             New-UDInputAction -Content @(
 
                 New-UDCard -Title "Website status" -Text $CardOutput -Links @(
-                        New-UDLink -Text $WebSiteName -Url "https://$($WebSiteName)"
+                        New-UDLink -Text $WebSiteName -Url "$($WebSiteName)"
                 ) -Size 'small' -BackgroundColor SteelBlue -FontColor White
     
             )
@@ -343,4 +347,4 @@ AddressList: $($Result.AddressList)
 #region Dashboard
 $Dashboard = New-UDDashboard -Pages @($Page1, $Page2, $Page3, $Page4, $Page5)
 
-Start-UDDashboard -Endpoint $Endpoint -Dashboard $Dashboard -Port 10001 -AutoReload
+Start-UDDashboard -Name "Tinus Dashboard" -Endpoint $Endpoint -Dashboard $Dashboard -Port 10001 -AutoReload

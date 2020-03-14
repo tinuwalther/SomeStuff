@@ -21,22 +21,32 @@ $Page1 = New-UDPage -Name "Home" -Title "Home - $($UDTitle)" -Content {
         New-UDLayout -Columns 3 -Content {
             
             New-UDCard -Title 'Connectivity Test' -Content {
-                New-UDParagraph -Text 'Test TCP connection to a remote Host and displays diagnostic information about this connection. You can specify the remote Host, and a TCP port to send the test. On the remote Host, there must be an Listener on the given TCP port otherwise the test fails.'
+                New-UDParagraph -Text 'Test TCP connection to a remote Host. On the remote Host, must be an Listener on the given TCP port otherwise the test fails.'
             } -Links @(
-                New-UDLink -Text 'Connectivity Test' -Url 'Connectivity-Tester'
-            ) -Size 'small'
+                New-UDLink -Text 'Connectivity Tester' -Url 'Connectivity-Tester'
+            ) 
 
-            New-UDCard -Title 'Windows Update' -Content {
-                New-UDParagraph -Text 'Get last 5 installed Windows Updates of a remote host.'
+            New-UDCard -Title 'Access Test' -Content {
+                New-UDParagraph -Text 'Test WinRM access to a remote host. You need a user account who is member of the local Administrators of the remote Host.'
+            } -Links @(
+                New-UDLink -Text 'Access Tester' -Url 'Access-Tester'
+            ) 
+
+            # Get-Hotfix -last 5
+            # Get-WindowsUpdateEventlog
+            New-UDCard -Title 'Windows Updates' -Content {
+                New-UDParagraph -Text 'NOT IMPLEMENTED YET!NOT IMPLEMENTED YET!NOT IMPLEMENTED YET!NOT IMPLEMENTED YET!NOT IMPLEMENTED YET!'
             } -Links @(
                 New-UDLink -Text 'Windows Updates' -Url 'Windows-Updates-Tester'
-            ) -Size 'small'
+            ) 
 
+            <#
             New-UDCard -Title 'Windows Eventlog' -Content {
                 New-UDParagraph -Text 'List I dont know yet ...'
             } -Links @(
                 New-UDLink -Text 'Windows Eventlog' -Url 'Windows-Eventlog-Tester'
             ) -Size 'small'
+            #>
 
         }
 
@@ -57,7 +67,7 @@ $Page2 = New-UDPage -Name "Connectivity Tester" -Title "Connectivity Tester - $(
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'RemoteName or IP Address'
+                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Remote Name or IP Address'
                 New-UDInputField -Type textbox  -Name Remoteport -Placeholder 'Remote TCPPort'
             } -Validate -Endpoint {
                 param(
@@ -107,6 +117,61 @@ $Page2 = New-UDPage -Name "Connectivity Tester" -Title "Connectivity Tester - $(
 }
 #endregion
 
+#region "ScriptBlock Tester"
+$Page6 = New-UDPage -Name "Access Tester" -Title "Access Tester - $($UDTitle)" -Content { 
+
+    New-UDLayout -Columns 1 -Content {
+
+        New-UDHeading -Size 4 -Content { "Test access to a remote Host" }
+
+        New-UDHeading -Size 6 -Content { "Test WinRM access, displays diagnostic information for a connection" }
+
+        New-UDLayout -Columns 1 -Content {
+            
+            New-UDInput -Title "Remote Information" -Content {
+                New-UDInputField -Type textbox  -Name Username   -Placeholder 'username@domain.com'
+                New-UDInputField -Type password -Name Password   -Placeholder 'Password'
+                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Remote Name or IP Address'
+            } -Validate -Endpoint {
+                param(
+                    [Parameter(Mandatory)]
+                    $Username, 
+
+                    [Parameter(Mandatory)]
+                    $Password, 
+
+                    [Parameter(Mandatory)]
+                    $Remotehost
+                )
+                Show-UDToast -Message "Send Tests to $Remotehost"
+                # Output a new card based on that info
+                $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
+                $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                if($rsession.State -eq 'Opened'){
+                    $TestReturn = $rsession.State
+                    $color = "LightGreen"
+                }else{
+                    $TestReturn = $rsession.State
+                    $color = "IndianRed"
+                }
+                New-UDInputAction -Content @(
+
+                    New-UDCard -Title "Details" -Text $TestReturn -Links @(
+                            #New-UDLink -Text "$ret"
+                    ) -Size 'small' -BackgroundColor $color -FontColor White
+
+                )
+
+            }
+
+        }
+
+    }
+
+}
+#endregion
+
 #region "Windows Update Tester"
 $Page3 = New-UDPage -Name "Windows Updates Tester" -Title "Windows Updates Tester - $($UDTitle)" -Content { 
 
@@ -119,7 +184,7 @@ $Page3 = New-UDPage -Name "Windows Updates Tester" -Title "Windows Updates Teste
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Username   -Placeholder 'Username'
+                New-UDInputField -Type textbox  -Name Username   -Placeholder 'username@domain.com'
                 New-UDInputField -Type password -Name Password   -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Remote Name or IP Address'
             } -Validate -Endpoint {
@@ -182,7 +247,7 @@ $Page4 = New-UDPage -Name "Windows Eventlog Tester" -Title "Windows Eventlog Tes
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Username   -Placeholder 'Username'
+                New-UDInputField -Type textbox  -Name Username   -Placeholder 'username@domain.com'
                 New-UDInputField -Type password -Name Password   -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Remote Name or IP Address'
             } -Validate -Endpoint {
@@ -245,7 +310,7 @@ $Page5 = New-UDPage -Name "Run Scriptblock" -Title "Run Scriptblock - $($UDTitle
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Username   -Placeholder 'Username'
+                New-UDInputField -Type textbox  -Name Username   -Placeholder 'username@domain.com'
                 New-UDInputField -Type password -Name Password   -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Remote Name or IP Address'
                 New-UDInputField -Type textbox  -Name Scriptblock -Placeholder 'Scriptblock'
@@ -289,17 +354,16 @@ $Page5 = New-UDPage -Name "Run Scriptblock" -Title "Run Scriptblock - $($UDTitle
 
 #region Dashboard
 $Navigation = New-UDSideNav -Content {
-    New-UDSideNavItem -Text "Home"              -PageName "Home"                     -Icon home 
-    New-UDSideNavItem -Text "Connectivity Test" -PageName "Connectivity Tester"      -Icon rocket 
-    New-UDSideNavItem -Text "Windows Updates"   -PageName "Windows Updates Tester"   -Icon rocket
-    New-UDSideNavItem -Text "Windows Eventlog"  -PageName "Windows Eventlog Tester"  -Icon rocket
-    New-UDSideNavItem -Text "Run Scriptblock"   -PageName "Run Scriptblock"          -Icon rocket
+    New-UDSideNavItem -Text "Home"                -PageName "Home"                     -Icon home 
+    New-UDSideNavItem -Text "Connectivity Tester" -PageName "Connectivity Tester"      -Icon rocket 
+    New-UDSideNavItem -Text "Access Tester"       -PageName "Access Tester"            -Icon rocket
+    New-UDSideNavItem -Text "Windows Updates"     -PageName "Windows Updates Tester"   -Icon rocket
+    #New-UDSideNavItem -Text "Windows Eventlog"    -PageName "Windows Eventlog Tester"  -Icon rocket
+    #New-UDSideNavItem -Text "Run Scriptblock"     -PageName "Run Scriptblock"          -Icon rocket
 } -Fixed
 
-$Dashboard = New-UDDashboard -Pages @($Page1, $Page2, $Page3, $Page4, $Page5) -Navigation $Navigation
+$Dashboard = New-UDDashboard -Pages @($Page1, $Page2, $Page3, $Page4, $Page5, $Page6) -Navigation $Navigation
 
 Start-UDDashboard -Name "OpsRemoteWinRM" -Endpoint $Endpoint -Dashboard $Dashboard -Port 20001 -AutoReload
 
 Start-Process "http://localhost:20001/Home"
-
-Get-UDDashboard
