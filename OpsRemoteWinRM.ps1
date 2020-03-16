@@ -97,6 +97,21 @@ function Get-SCSWindowsEventLog{
     Invoke-Command -Session $rsession -ScriptBlock $ScriptBlockContent -ArgumentList $EventlogName
 }
 
+function Get-SCSRegistryProperties{
+    [CmdletBinding()]
+    param(
+        $RemoteSession,
+        $RegistryPath
+    )
+
+    $ScriptBlockContent = {
+        Param($RegistryPath)
+        Get-Item -Path $RegistryPath
+    }
+    Invoke-Command -Session $rsession -ScriptBlock $ScriptBlockContent -ArgumentList $RegistryPath | ForEach-Object {
+        "$($_.Name), $($_.Property)`r`n"
+    }
+}
 function Get-SCSRegistryValue{
     [CmdletBinding()]
     param(
@@ -115,7 +130,7 @@ function Get-SCSRegistryValue{
 #endregion
 
 #region "Home"
-$Page1 = New-UDPage -Name "Home" -Title "Home - $($UDTitle)" -Content { 
+$Page1 = New-UDPage -Name "Home" -Title "$($UDTitle)" -Content { 
 
     New-UDLayout -Columns 1 -Content {
 
@@ -169,13 +184,13 @@ $Page1 = New-UDPage -Name "Home" -Title "Home - $($UDTitle)" -Content {
 #endregion
 
 #region "Name Resolution Tester"
-$Page7 = New-UDPage -Name "Name Resolution Tester" -Title "Name Resolution Tester - $($UDTitle)" -Content { 
+$Page7 = New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Content { 
 
     New-UDLayout -Columns 1 -Content {
 
-        New-UDHeading -Size 4 -Content { "Test Name Resolution to a remote Host" }
+        New-UDHeading -Size 4 -Content { "Name Resolution Tester" }
 
-        New-UDHeading -Size 6 -Content { "Test Forwardlookup to a remote Host" }
+        New-UDHeading -Size 6 -Content { "Test the Forwardlookup to a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
             
@@ -188,38 +203,24 @@ $Page7 = New-UDPage -Name "Name Resolution Tester" -Title "Name Resolution Teste
                 )
 
                 Show-UDToast -Message "Send Tests to $Remotehost" -Balloon
-                # Output a new card based on that info
 
                 try{
-                    $TestReturn = Resolve-DnsName -Name $Remotehost -WarningAction SilentlyContinue -DnsOnly | where Type -eq A
-                
-                    $CardOutput = @"
-                    Input    : $Remotehost
-                    Name     : $($TestReturn.Name)
-                    Type     : $($TestReturn.Type)
-                    TTL      : $($TestReturn.TTL)
-                    Section  : $($TestReturn.Section)
-                    NameHost : $($TestReturn.NameHost)
-                    IPAddress: $($TestReturn.IPAddress)
-"@
-
-                    $ret   = "Name Resolution for $Remotehost is OK"
-                    $color = "LightGreen"
-
+                    $TestReturn = Resolve-DnsName -Name $Remotehost -WarningAction SilentlyContinue -DnsOnly # | Where-Object Type -eq A
+                    $CardOutput = "Input: $Remotehost -> Name: $($TestReturn.Name) -> IPAddress: $($TestReturn.IPAddress)"
                 }
                 catch{
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
-                    $ret        = "Error in Test"
-                    $color      = "IndianRed"
                     $Error.Clear()
                 }
 
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Title "Details" -Text $CardOutput -Links @(
-                            New-UDLink -Text "$ret"  -Url 'Name-Resolution-Tester'
-                    ) -BackgroundColor $color -FontColor White
+                    New-UDCard -Text $CardOutput
 
+                    New-UDGrid -Title "Details" -Endpoint {
+                        $TestReturn | Select-Object Name,Type,TTL,Section,NameHost,IPAddress | Out-UDGridData
+                    }
+                    
                 )
 
             }
@@ -232,13 +233,13 @@ $Page7 = New-UDPage -Name "Name Resolution Tester" -Title "Name Resolution Teste
 #endregion
 
 #region "Connectivity Tester"
-$Page2 = New-UDPage -Name "Connectivity Tester" -Title "Connectivity Tester - $($UDTitle)" -Content { 
+$Page2 = New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content { 
 
     New-UDLayout -Columns 1 -Content {
 
-        New-UDHeading -Size 4 -Content { "Test connection to a remote Host" }
+        New-UDHeading -Size 4 -Content { "Connectivity Tester" }
 
-        New-UDHeading -Size 6 -Content { "Test TCP connection, displays diagnostic information for a connection" }
+        New-UDHeading -Size 6 -Content { "Test TCP connection to a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
             
@@ -257,42 +258,23 @@ $Page2 = New-UDPage -Name "Connectivity Tester" -Title "Connectivity Tester - $(
                 )
 
                 Show-UDToast -Message "Send Tests to $Remotehost" -Balloon
-                # Output a new card based on that info
 
                 try{
                     $TestReturn = Test-NetConnection -ComputerName $Remotehost -Port $Remoteport -WarningAction SilentlyContinue
-                
-                    $CardOutput = @"
-                    Input            : $Remotehost
-                    ComputerName     : $($TestReturn.ComputerName)
-                    RemoteAddress    : $($TestReturn.RemoteAddress)
-                    RemotePort       : $($TestReturn.RemotePort)
-                    InterfaceAlias   : $($TestReturn.InterfaceAlias)
-                    PingSucceeded    : $($TestReturn.PingSucceeded)
-                    TcpTestSucceeded : $($TestReturn.TcpTestSucceeded)
-"@
-
-                    if($TestReturn.TcpTestSucceeded){
-                        $ret   = "Connectivity over $Remoteport is OK"
-                        $color = "LightGreen"
-                    }else{
-                        $ret   = "Connectivity over $Remoteport is not OK"
-                        $color = "IndianRed"
-                    }
-
+                    $CardOutput = "Input: $Remotehost -> Name: $($TestReturn.ComputerName) -> IP Address: $($TestReturn.RemoteAddress) -> TcpTestSucceeded: $($TestReturn.TcpTestSucceeded)"    
                 }
                 catch{
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
-                    $ret        = "Error in Test"
-                    $color      = "IndianRed"
                     $Error.Clear()
                 }
 
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Title "Details" -Text $CardOutput -Links @(
-                            New-UDLink -Text "$ret" -Url 'Connectivity-Tester'
-                    ) -BackgroundColor $color -FontColor White
+                    New-UDCard -Text $CardOutput
+
+                    New-UDGrid -Title "Details" -Endpoint {
+                        $TestReturn | Select-Object ComputerName,RemotePort,InterfaceAlias,PingSucceeded,TcpTestSucceeded | Out-UDGridData
+                    }
 
                 )
 
@@ -306,13 +288,13 @@ $Page2 = New-UDPage -Name "Connectivity Tester" -Title "Connectivity Tester - $(
 #endregion
 
 #region "Access Tester"
-$Page6 = New-UDPage -Name "Access Tester" -Title "Access Tester - $($UDTitle)" -Content { 
+$Page6 = New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content { 
 
     New-UDLayout -Columns 1 -Content {
 
-        New-UDHeading -Size 4 -Content { "Test access to a remote Host" }
+        New-UDHeading -Size 4 -Content { "Access Tester" }
 
-        New-UDHeading -Size 6 -Content { "Test WinRM access, displays diagnostic information for a connection" }
+        New-UDHeading -Size 6 -Content { "Test WinRM accessto a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
             
@@ -340,8 +322,8 @@ $Page6 = New-UDPage -Name "Access Tester" -Title "Access Tester - $($UDTitle)" -
                     $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
                 
                     if($rsession.State -eq 'Opened'){
-                        $ret   = "Access to $Remotehost is OK"
-                        $color = "LightGreen"
+                        $LinkText  = "successfull"
+                        $FontColor = "Black"
                         
                         $CardOutput = @"
                         Input        : $Remotehost
@@ -352,8 +334,8 @@ $Page6 = New-UDPage -Name "Access Tester" -Title "Access Tester - $($UDTitle)" -
                         Availability : $($rsession.Availability)
 "@
                     }else{
-                        $ret   = "Access to $Remotehost is not OK"
-                        $color = "IndianRed"
+                        $LinkText   = "not successfull"
+                        $FontColor  = "Red"
                         $CardOutput = "Session to $Remotehost is $($rsession.State)"
                     }
                     Remove-PSSession -Session $rsession
@@ -361,16 +343,16 @@ $Page6 = New-UDPage -Name "Access Tester" -Title "Access Tester - $($UDTitle)" -
                 }
                 catch{
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
-                    $ret        = "Error in Test"
-                    $color      = "IndianRed"
+                    $LinkText   = "Error in Test"
+                    $FontColor  = "IndianRed"
                     $Error.Clear()
                 }
 
                 New-UDInputAction -Content @(
 
                     New-UDCard -Title "Details" -Text $CardOutput -Links @(
-                            New-UDLink -Text "$ret" -Url 'Access-Tester'
-                    ) -BackgroundColor $color -FontColor White
+                        New-UDLink -Text $LinkText -Url 'Access-Tester'
+                    ) -FontColor $FontColor
 
                 )
 
@@ -384,13 +366,13 @@ $Page6 = New-UDPage -Name "Access Tester" -Title "Access Tester - $($UDTitle)" -
 #endregion
 
 #region "Windows Update Tester"
-$Page3 = New-UDPage -Name "Windows Updates Tester" -Title "Windows Updates Tester - $($UDTitle)" -Content { 
+$Page3 = New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Content { 
 
     New-UDLayout -Columns 1 -Content {
 
-        New-UDHeading -Size 4 -Content { "List Windows Updates from a remote Host" }
+        New-UDHeading -Size 4 -Content { "Windows Updates Tester" }
 
-        New-UDHeading -Size 6 -Content { "Displays diagnostic information for a connection" }
+        New-UDHeading -Size 6 -Content { "List Windows Updates from a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
             
@@ -418,6 +400,9 @@ $Page3 = New-UDPage -Name "Windows Updates Tester" -Title "Windows Updates Teste
                     $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
                 
                     if($rsession.State -eq 'Opened'){
+                        $LinkText  = "successfull"
+                        $FontColor = "Black"
+
                         $CardOutput = @"
                         Input        : $($Remotehost)
                         ComputerName : $(Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME})
@@ -435,8 +420,8 @@ $Page3 = New-UDPage -Name "Windows Updates Tester" -Title "Windows Updates Teste
 "@
 
                     }else{
-                        $ret   = "Access to $Remotehost is not OK"
-                        $color = "IndianRed"
+                        $LinkText   = "not successfull"
+                        $FontColor  = "Red"
                         $CardOutput = "Session to $Remotehost is $($rsession.State)"
                     }
                     Remove-PSSession -Session $rsession
@@ -444,16 +429,16 @@ $Page3 = New-UDPage -Name "Windows Updates Tester" -Title "Windows Updates Teste
                 }
                 catch{
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
-                    $ret        = "Error in Test"
-                    $color      = "IndianRed"
+                    $LinkText   = "Error in Test"
+                    $FontColor  = "IndianRed"
                     $Error.Clear()
                 }
 
                 New-UDInputAction -Content @(
 
                     New-UDCard -Title "Details" -Text $CardOutput -Links @(
-                        New-UDLink -Text 'Microsoft Update-Catalog' -Url 'https://www.catalog.update.microsoft.com/Home.aspx'
-                    )
+                        New-UDLink -Text $LinkText -Url 'https://www.catalog.update.microsoft.com/Home.aspx'
+                    ) -FontColor $FontColor
 
                 )
 
@@ -467,13 +452,13 @@ $Page3 = New-UDPage -Name "Windows Updates Tester" -Title "Windows Updates Teste
 #endregion
 
 #region "Windows Eventlog Tester"
-$Page4 = New-UDPage -Name "Windows Eventlog Tester" -Title "Windows Eventlog Tester - $($UDTitle)" -Content { 
+$Page4 = New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Content { 
 
     New-UDLayout -Columns 1 -Content {
 
-        New-UDHeading -Size 4 -Content { "List Windows Eventlog from a remote Host" }
+        New-UDHeading -Size 4 -Content { "Windows Eventlog Tester" }
 
-        New-UDHeading -Size 6 -Content { "Displays diagnostic information for a connection" }
+        New-UDHeading -Size 6 -Content { "List Windows Eventlog from a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
             
@@ -505,6 +490,9 @@ $Page4 = New-UDPage -Name "Windows Eventlog Tester" -Title "Windows Eventlog Tes
                     $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
                 
                     if($rsession.State -eq 'Opened'){
+                        $LinkText  = "successfull"
+                        $FontColor = "Black"
+
                         $CardOutput = @"
                         Input        : $($Remotehost)
                         ComputerName : $(Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME})
@@ -515,25 +503,25 @@ $Page4 = New-UDPage -Name "Windows Eventlog Tester" -Title "Windows Eventlog Tes
 "@
 
                     }else{
-                        $ret   = "Access to $Remotehost is not OK"
-                        $color = "IndianRed"
                         $CardOutput = "Session to $Remotehost is $($rsession.State)"
+                        $LinkText   = "not successfull"
+                        $FontColor  = "Red"
                     }
                     Remove-PSSession -Session $rsession
 
                 }
                 catch{
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
-                    $ret        = "Error in Test"
-                    $color      = "IndianRed"
+                    $LinkText   = "Error in Test"
+                    $FontColor  = "IndianRed"
                     $Error.Clear()
                 }
 
                 New-UDInputAction -Content @(
 
                     New-UDCard -Title "Details" -Text $CardOutput -Links @(
-                        New-UDLink -Text $Eventlog
-                    )
+                        New-UDLink -Text $LinkText
+                    ) -FontColor $FontColor
 
                 )
 
@@ -547,16 +535,82 @@ $Page4 = New-UDPage -Name "Windows Eventlog Tester" -Title "Windows Eventlog Tes
 #endregion
 
 #region "Registry Tester"
-$Page5 = New-UDPage -Name "Windows Registry Tester" -Title "Windows Registry Tester - $($UDTitle)" -Content { 
+$Page5 = New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Content { 
 
     New-UDLayout -Columns 1 -Content {
 
-        New-UDHeading -Size 4 -Content { "List Windows Registry value from a remote Host" }
+        New-UDHeading -Size 4 -Content { "Windows Registry Tester" }
 
-        New-UDHeading -Size 6 -Content { "Displays diagnostic information for a connection" }
+        New-UDHeading -Size 6 -Content { "List Windows Registry properties from a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
             
+            New-UDInput -Title "Remote Information" -Content {
+                New-UDInputField -Type textbox  -Name Username     -Placeholder 'username@domain.com'
+                New-UDInputField -Type password -Name Password     -Placeholder 'Password'
+                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Remote Name or IP Address'
+                New-UDInputField -Type textbox  -Name RegistryPath -Placeholder 'Registry Path'
+            } -Validate -Endpoint {
+                param(
+                    [Parameter(Mandatory)]
+                    $Username, 
+
+                    [Parameter(Mandatory)]
+                    $Password, 
+
+                    [Parameter(Mandatory)]
+                    $Remotehost,
+
+                    [Parameter(Mandatory)]
+                    $RegistryPath
+                )
+                Show-UDToast -Message "Send Tests to $Remotehost"
+                # Output a new card based on that info
+
+                try{
+                    $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
+                    $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                    $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                
+                    if($rsession.State -eq 'Opened'){
+                        $LinkText  = "successfull"
+                        $FontColor = "Black"
+
+                        $CardOutput = @"
+                        Input        : $($Remotehost)
+                        ComputerName : $(Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME})
+
+                        Properties for Path: $($RegistryPath):
+                        $(Get-SCSRegistryProperties -RemoteSession $rsession -RegistryPath $RegistryPath)
+"@
+
+                    }else{
+                        $CardOutput = "Session to $Remotehost is $($rsession.State)"
+                        $LinkText   = "not successfull"
+                        $FontColor  = "Red"
+                    }
+                    Remove-PSSession -Session $rsession
+
+                }
+                catch{
+                    $CardOutput = "$($Remotehost): $($_.Exception.Message)"
+                    $LinkText   = "Error in Test"
+                    $FontColor  = "IndianRed"
+                    $Error.Clear()
+                }
+
+                New-UDInputAction -Content @(
+
+                    New-UDCard -Title "Details" -Text $CardOutput -Links @(
+                        New-UDLink -Text $LinkText
+                    ) -FontColor $FontColor
+
+                )
+
+            }
+
+            New-UDHeading -Size 6 -Content { "List Windows Registry value from a remote Host" }
+
             New-UDInput -Title "Remote Information" -Content {
                 New-UDInputField -Type textbox  -Name Username     -Placeholder 'username@domain.com'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
@@ -589,6 +643,9 @@ $Page5 = New-UDPage -Name "Windows Registry Tester" -Title "Windows Registry Tes
                     $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
                 
                     if($rsession.State -eq 'Opened'){
+                        $LinkText  = "successfull"
+                        $FontColor = "Black"
+
                         $CardOutput = @"
                         Input        : $($Remotehost)
                         ComputerName : $(Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME})
@@ -598,25 +655,25 @@ $Page5 = New-UDPage -Name "Windows Registry Tester" -Title "Windows Registry Tes
 "@
 
                     }else{
-                        $ret   = "Access to $Remotehost is not OK"
-                        $color = "IndianRed"
                         $CardOutput = "Session to $Remotehost is $($rsession.State)"
+                        $LinkText   = "not successfull"
+                        $FontColor  = "Red"
                     }
                     Remove-PSSession -Session $rsession
 
                 }
                 catch{
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
-                    $ret        = "Error in Test"
-                    $color      = "IndianRed"
+                    $LinkText   = "Error in Test"
+                    $FontColor  = "IndianRed"
                     $Error.Clear()
                 }
 
                 New-UDInputAction -Content @(
 
                     New-UDCard -Title "Details" -Text $CardOutput -Links @(
-                        #New-UDLink -Text 'Microsoft Update-Catalog' -Url 'https://www.catalog.update.microsoft.com/Home.aspx'
-                    )
+                        New-UDLink -Text $LinkText
+                    ) -FontColor $FontColor
 
                 )
 
