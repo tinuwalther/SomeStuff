@@ -9,6 +9,9 @@
 if(!(Get-Module UniversalDashboard.Community)){
     Import-Module UniversalDashboard.Community
 }
+if(!(Get-Module PsNetTools)){
+    Import-Module PsNetTools
+}
 
 $UDTitle = "Remote Operating"
 
@@ -205,8 +208,9 @@ $Page7 = New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Content
                 Show-UDToast -Message "Send Tests to $Remotehost" -Balloon
 
                 try{
-                    $TestReturn = Resolve-DnsName -Name $Remotehost -WarningAction SilentlyContinue -DnsOnly # | Where-Object Type -eq A
-                    $CardOutput = "Input: $Remotehost -> Name: $($TestReturn.Name) -> IPAddress: $($TestReturn.IPAddress)"
+                    #$TestReturn = Resolve-DnsName -Name $Remotehost -WarningAction SilentlyContinue -DnsOnly # | Where-Object Type -eq A
+                    $TestReturn = Test-PsNetDig -Destination $Remotehost
+                    $CardOutput = "Test-PsNetDig -Destination $Remotehost"
                 }
                 catch{
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
@@ -218,7 +222,8 @@ $Page7 = New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Content
                     New-UDCard -Text $CardOutput
 
                     New-UDGrid -Title "Details" -Endpoint {
-                        $TestReturn | Select-Object Name,Type,TTL,Section,NameHost,IPAddress | Out-UDGridData
+                        #$TestReturn | Select-Object Name,Type,TTL,Section,NameHost,IPAddress | Out-UDGridData
+                        $TestReturn | Out-UDGridData
                     }
                     
                 )
@@ -260,8 +265,9 @@ $Page2 = New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content {
                 Show-UDToast -Message "Send Tests to $Remotehost" -Balloon
 
                 try{
-                    $TestReturn = Test-NetConnection -ComputerName $Remotehost -Port $Remoteport -WarningAction SilentlyContinue
-                    $CardOutput = "Input: $Remotehost -> Name: $($TestReturn.ComputerName) -> IP Address: $($TestReturn.RemoteAddress) -> TcpTestSucceeded: $($TestReturn.TcpTestSucceeded)"    
+                    #$TestReturn = Test-NetConnection -ComputerName $Remotehost -Port $Remoteport -WarningAction SilentlyContinue
+                    $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort $Remoteport
+                    $CardOutput = "Test-PsNetTping -Destination $Remotehost -TcpPort $Remoteport"    
                 }
                 catch{
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
@@ -273,7 +279,8 @@ $Page2 = New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content {
                     New-UDCard -Text $CardOutput
 
                     New-UDGrid -Title "Details" -Endpoint {
-                        $TestReturn | Select-Object ComputerName,RemotePort,InterfaceAlias,PingSucceeded,TcpTestSucceeded | Out-UDGridData
+                        #$TestReturn | Select-Object ComputerName,RemotePort,InterfaceAlias,PingSucceeded,TcpTestSucceeded | Out-UDGridData
+                        $TestReturn | Out-UDGridData
                     }
 
                 )
