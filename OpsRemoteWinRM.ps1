@@ -50,6 +50,18 @@ function Get-SCSServices{
 
 }
 
+function Get-SCSProcesses{
+    [CmdletBinding()]
+    param(
+        $RemoteSession
+    )
+
+    Invoke-Command -Session $RemoteSession -ScriptBlock {
+        Get-CimInstance win32_process | Select-Object ProcessId,Name,WorkingSetSize,VirtualSize,Path,CommandLine
+    }
+
+}
+
 function Get-InstalledUpdates{
     [CmdletBinding()]
     param(
@@ -85,7 +97,18 @@ function Get-FileContent{
 
     $ScriptBlockContent = {
         Param($File)
-        Get-Content -Path $File -ReadCount 5000
+        #Get-Content -Path $File -ReadCount 5000
+        $i = 0
+        [System.IO.File]::ReadLines($File) | ForEach-Object {
+            
+            if(!([String]::IsNullOrEmpty($_))){
+                [PSCustomObject]@{
+                    Line = $i
+                    Text = $_
+                }
+            }
+            $i ++
+        }
     }
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $File
 }
@@ -283,13 +306,15 @@ $Page1 = New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
                 New-UDLink -Text 'Windows Services' -Url 'Windows-Service-Tester'
             ) -Size small
 
-            New-UDCard -Title 'Requirements' -Content {
-                New-UDParagraph -Text 'PowerShell Modules: UniversalDashboard.Community, PsNetTools, Universal Dashboard requires .NET Framework version 4.7.2'
+            New-UDCard -Title 'Windows Processes' -Content {
+                New-UDParagraph -Text 'List Windows Processes from a remote host.'
             } -Links @(
                 #New-UDLink -Text 'Windows Services' -Url 'Windows-Service-Tester'
             ) -Size small
 
         }
+        
+        New-UDHeading -Size 6 -Content{ "PowerShell Modules: UniversalDashboard.Community, PsNetTools, Universal Dashboard requires .NET Framework version 4.7.2" }
 
     }
 
@@ -787,11 +812,15 @@ $Page8 = New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
                         $FileProperties | Select-Object Name,FullName,LastWriteTime | Out-UDGridData
                     }
 
-                    New-UDCollapsible -Id "FileContent" -Items {
-                        New-UDCollapsibleItem -Title "File content" -Icon file -Content {
-                            New-UDCard -Text $FileContent
-                        }
+                    New-UDGrid -Title "File content" -Endpoint {
+                        $FileContent | Select-Object Line,Text | Out-UDGridData
                     }
+
+                    #New-UDCollapsible -Id "FileContent" -Items {
+                        #New-UDCollapsibleItem -Title "File content" -Icon file -Content {
+                            #New-UDCard -Text $FileContent
+                        #}
+                    #}
 
                 )
 
@@ -804,7 +833,7 @@ $Page8 = New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
 }
 #endregion
 
-#region "Execute PSScript"
+#region "Windows Service Tester"
 $Page9 = New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Content { 
 
     New-UDLayout -Columns 1 -Content {
@@ -875,6 +904,77 @@ $Page9 = New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Content
 }
 #endregion
 
+#region "Windows Process Tester"
+$Page10 = New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Content { 
+
+    New-UDLayout -Columns 1 -Content {
+
+        New-UDHeading -Size 4 -Content { "Windows Process Tester" }
+
+        New-UDHeading -Size 6 -Content { "List Windows Processes from a remote Host" }
+
+        New-UDLayout -Columns 1 -Content {
+            
+            New-UDInput -Title "Remote Information" -Content {
+                New-UDInputField -Type textbox  -Name Username     -Placeholder 'username@domain.com'
+                New-UDInputField -Type password -Name Password     -Placeholder 'Password'
+                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Remote Name or IP Address'
+            } -Validate -Endpoint {
+                param(
+                    [Parameter(Mandatory)]
+                    $Username, 
+
+                    [Parameter(Mandatory)]
+                    $Password, 
+
+                    [Parameter(Mandatory)]
+                    $Remotehost
+                )
+                Show-UDToast -Message "Send Tests to $Remotehost"
+                # Output a new card based on that info
+
+                try{
+                    $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
+                    if($TestReturn.TcpSucceeded){
+                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
+                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        if($rsession.State -eq 'Opened'){
+                            $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
+                            $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
+                            $TestResult     = Get-SCSProcesses -RemoteSession $rsession
+                        }else{
+                            $CardOutput = "Session to $Remotehost is $($rsession.State)"
+                        }
+                        Remove-PSSession -Session $rsession
+                    }else{
+                        $CardOutput = "Test-PsNetTping -Destination $Remotehost -TcpPort 5985"
+                    }
+                }
+                catch{
+                    $CardOutput = "$($Remotehost): $($_.Exception.Message)"
+                    $Error.Clear()
+                }
+
+                New-UDInputAction -Content @(
+
+                    New-UDCard -Text $CardOutput
+
+                    New-UDGrid -Title "Windows Processes" -Endpoint {
+                        $TestResult | Select-Object ProcessId,Name,WorkingSetSize,VirtualSize,Path,CommandLine | Out-UDGridData
+                    }
+
+                )
+
+            }
+
+        }
+
+    }
+
+}
+#endregion
+
 #region Dashboard
 $Navigation = New-UDSideNav -Content {
     New-UDSideNavItem -Text "Home"                   -PageName "Home"                     -Icon home 
@@ -886,9 +986,10 @@ $Navigation = New-UDSideNav -Content {
     New-UDSideNavItem -Text "Windows Registry"       -PageName "Windows Registry Tester"  -Icon rocket
     New-UDSideNavItem -Text "Windows File Reader"    -PageName "Windows File Reader"      -Icon rocket
     New-UDSideNavItem -Text "Windows Services"       -PageName "Windows Service Tester"   -Icon rocket
+    New-UDSideNavItem -Text "Windows Processes"      -PageName "Windows Process Tester"   -Icon rocket
 } -Fixed
 
-$Dashboard = New-UDDashboard -Pages @($Page1, $Page2, $Page3, $Page4, $Page5, $Page6, $Page7, $Page8, $Page9) -Navigation $Navigation
+$Dashboard = New-UDDashboard -Pages @($Page1,$Page2,$Page3,$Page4,$Page5,$Page6,$Page7,$Page8,$Page9,$Page10) -Navigation $Navigation
 
 Start-UDDashboard -Name "OpsRemoteWinRM" -Endpoint $Endpoint -Dashboard $Dashboard -Port 20001 -AutoReload
 
