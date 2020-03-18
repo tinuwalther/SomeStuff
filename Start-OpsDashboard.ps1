@@ -94,12 +94,19 @@ function Get-WsusServer{
 function Get-SCSServices{
     [CmdletBinding()]
     param(
-        $RemoteSession
+        $RemoteSession,
+        $State
     )
-
-    Invoke-Command -Session $RemoteSession -ScriptBlock {
-        Get-CimInstance win32_service | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName
+    $ScriptBlockContent = {
+        Param($State)
+        if($State -eq 'All'){
+            Get-CimInstance win32_service | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName
+        }else{
+            Get-CimInstance win32_service | Where-Object State -eq $State | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName
+        }
     }
+    Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $State
+    #Invoke-Command -ScriptBlock $ScriptBlockContent -ArgumentList $State
 
 }
 
@@ -139,6 +146,17 @@ function Get-FileProperties{
         Get-Item -Path $File
     }
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $File
+}
+
+function Get-SCSWindowsFeature{
+    [CmdletBinding()]
+    param(
+        $RemoteSession
+    )
+    $ScriptBlockContent = {
+        Get-WindowsFeature | Where-Object {$_.Installed -match $True} | Select-Object DisplayName,Name,Installstate
+    }
+    Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent
 }
 
 function Get-FileContent{
@@ -220,18 +238,28 @@ function Get-SCSWindowsEventLog{
     [CmdletBinding()]
     param(
         $RemoteSession,
-        $EventlogName
+        $EventlogName,
+        $Level,
+        $MaxEvents
     )
-
     $ScriptBlockContent = {
-        Param($EventlogName)
-        Get-WinEvent -MaxEvents 2000 -FilterHashtable @{
-            Logname   = $EventlogName
-            StartTime = (get-date).AddDays(-5)
-            EndTime   = get-date
-        } -ErrorAction SilentlyContinue | Select-Object TimeCreated,LogName,ProviderName,Id,LevelDisplayName,Message,MachineName
+        Param($EventlogName,$Level,$MaxEvents)
+        if($Level -eq 'All'){
+            Get-WinEvent -MaxEvents $MaxEvents -FilterHashtable @{
+                Logname   = $EventlogName
+                StartTime = (get-date).AddDays(-5)
+                EndTime   = get-date
+            } -ErrorAction SilentlyContinue | Select-Object TimeCreated,LogName,ProviderName,Id,LevelDisplayName,Message,MachineName
+        }else{
+            Get-WinEvent -MaxEvents $MaxEvents -FilterHashtable @{
+                Logname   = $EventlogName
+                StartTime = (get-date).AddDays(-5)
+                EndTime   = get-date
+            } -ErrorAction SilentlyContinue | Where-Object LevelDisplayName -eq $Level | Select-Object TimeCreated,LogName,ProviderName,Id,LevelDisplayName,Message,MachineName
+        }
     }
-    Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $EventlogName
+    Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $EventlogName,$Level,$MaxEvents
+    #Invoke-Command -ScriptBlock $ScriptBlockContent -ArgumentList $EventlogName,$Level,$MaxEvents
 }
 
 function Get-SCSRegistryItem{
@@ -318,60 +346,65 @@ $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
         New-UDLayout -Columns 3 -Content {
             
             New-UDCard -Title 'Name Resolution Tester' -Content {
-                New-UDParagraph -Text 'Test TCP connection to a remote Host. On the remote Host, must be an Listener on the given TCP port otherwise the test fails.'
+                New-UDParagraph -Text 'Test Forwardlookup to a host.'
             } -Links @(
                 New-UDLink -Text 'Name Resolution Tester' -Url 'Name-Resolution-Tester'
-            ) -Size small
+            ) #-Size small
 
             New-UDCard -Title 'Connectivity Tester' -Content {
-                New-UDParagraph -Text 'Test TCP connection to a remote Host. On the remote Host, must be an Listener on the given TCP port otherwise the test fails.'
+                New-UDParagraph -Text 'Test TCP connection to a remote host.'
             } -Links @(
                 New-UDLink -Text 'Connectivity Tester' -Url 'Connectivity-Tester'
-            ) -Size small
+            ) #-Size small
 
             New-UDCard -Title 'Access Tester' -Content {
-                New-UDParagraph -Text 'Test WinRM access to a remote host. You need a user account who is member of the local Administrators of the remote Host.'
+                New-UDParagraph -Text 'Test WinRM access to a remote host.'
             } -Links @(
                 New-UDLink -Text 'Access Tester' -Url 'Access-Tester'
-            ) -Size small
+            ) #-Size small
 
             New-UDCard -Title 'Windows Updates' -Content {
-                New-UDParagraph -Text 'List configured WSUS Server, the last 5 installed Windows Update, MissingUpdates, and last 5 days of WindowsUpdateClient Enventlog.'
+                New-UDParagraph -Text 'List WSUS Server, installed Update, missing Updates, and WindowsUpdateClient Enventlog.'
             } -Links @(
                 New-UDLink -Text 'Windows Updates' -Url 'Windows-Updates-Tester'
-            ) -Size small
+            ) #-Size small
 
             New-UDCard -Title 'Windows Eventlog' -Content {
-                New-UDParagraph -Text 'List the last 100 Eventlog entries from the last 5 days of a Windows Eventlog.'
+                New-UDParagraph -Text 'List Eventlog entries from the last 5 days from a remote host.'
             } -Links @(
                 New-UDLink -Text 'Windows Eventlog' -Url 'Windows-Eventlog-Tester'
-            ) -Size small
+            ) #-Size small
 
             New-UDCard -Title 'Windows Registry' -Content {
-                New-UDParagraph -Text 'List the Value of a Windows Registry path and name.'
+                New-UDParagraph -Text 'List the Value of a Windows Registry path and name from a remote host.'
             } -Links @(
                 New-UDLink -Text 'Windows Registry' -Url 'Windows-Registry-Tester'
-            ) -Size small
-
-            New-UDCard -Title 'Windows File Reader' -Content {
-                New-UDParagraph -Text 'List file properties and the file content from a remote host.'
-            } -Links @(
-                New-UDLink -Text 'Windows File Reader' -Url 'Windows-File-Reader'
-            ) -Size small
+            ) #-Size small
 
             New-UDCard -Title 'Windows Services' -Content {
                 New-UDParagraph -Text 'List Windows Services from a remote host.'
             } -Links @(
                 New-UDLink -Text 'Windows Services' -Url 'Windows-Service-Tester'
-            ) -Size small
+            ) #-Size small
 
             New-UDCard -Title 'Windows Processes' -Content {
                 New-UDParagraph -Text 'List Windows Processes from a remote host.'
             } -Links @(
-                #New-UDLink -Text 'Windows Services' -Url 'Windows-Service-Tester'
-            ) -Size small
+                New-UDLink -Text 'Windows Processes' -Url 'Windows-Process-Tester'
+            ) #-Size small
 
-        }
+            New-UDCard -Title 'Windows Features' -Content {
+                New-UDParagraph -Text 'List installed Windows Features from a remote host.'
+            } -Links @(
+                New-UDLink -Text 'Windows Features' -Url 'Windows-Feature-Tester'
+            ) #-Size small
+ 
+            New-UDCard -Title 'Windows File Reader' -Content {
+                New-UDParagraph -Text 'List file properties and the file content from a remote host.'
+            } -Links @(
+                New-UDLink -Text 'Windows File Reader' -Url 'Windows-File-Reader'
+            ) #-Size small
+       }
         
         New-UDHeading -Size 6 -Content{ "PowerShell Modules: UniversalDashboard.Community, PsNetTools, Universal Dashboard requires .NET Framework version 4.7.2" }
 
@@ -387,12 +420,12 @@ $Pages += New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Conten
 
         New-UDHeading -Size 4 -Content { "Name Resolution Tester" }
 
-        New-UDHeading -Size 6 -Content { "Test the Forwardlookup to a remote Host" }
+        New-UDHeading -Size 6 -Content { "Test the Forwardlookup to a remote host" }
 
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Remote Name or IP Address'
+                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Name or IP Address'
             } -Validate -Endpoint {
                 param(
                     [Parameter(Mandatory)]
@@ -436,12 +469,12 @@ $Pages += New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content {
 
         New-UDHeading -Size 4 -Content { "Connectivity Tester" }
 
-        New-UDHeading -Size 6 -Content { "Test TCP connection to a remote Host" }
+        New-UDHeading -Size 6 -Content { "Test TCP connection to a remote Host. On the remote Host, must be an Listener on the given TCP port otherwise the test fails." }
 
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Remote Name or IP Address'
+                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Name or IP Address'
                 New-UDInputField -Type textbox  -Name Remoteport -Placeholder 'Remote TCPPort'
             } -Validate -Endpoint {
                 param(
@@ -491,14 +524,14 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
 
         New-UDHeading -Size 4 -Content { "Access Tester" }
 
-        New-UDHeading -Size 6 -Content { "Test WinRM accessto a remote Host" }
+        New-UDHeading -Size 6 -Content { "Test WinRM access to a remote host. You need a user account who is member of the local Administrators of the remote Host." }
 
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Username   -Placeholder 'username@domain.com'
+                New-UDInputField -Type textbox  -Name Username   -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password   -Placeholder 'Password'
-                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Remote Name or IP Address'
+                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Name or IP Address'
             } -Validate -Endpoint {
                 param(
                     [Parameter(Mandatory)]
@@ -569,14 +602,14 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
 
         New-UDHeading -Size 4 -Content { "Windows Updates Tester" }
 
-        New-UDHeading -Size 6 -Content { "List Windows Updates from a remote Host" }
+        New-UDHeading -Size 6 -Content { "List configured WSUS Server, the last 5 installed Windows Update, missing Updates, and last 5 days of WindowsUpdateClient Enventlog from a remote Host." }
 
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Username   -Placeholder 'username@domain.com'
+                New-UDInputField -Type textbox  -Name Username   -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password   -Placeholder 'Password'
-                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Remote Name or IP Address'
+                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Name or IP Address'
             } -Validate -Endpoint {
                 param(
                     [Parameter(Mandatory)]
@@ -661,10 +694,12 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Username   -Placeholder 'username@domain.com'
+                New-UDInputField -Type textbox  -Name Username   -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password   -Placeholder 'Password'
-                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Remote Name or IP Address'
+                New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Name or IP Address'
                 New-UDInputField -Type textbox  -Name Eventlog   -Placeholder 'Eventlog'
+                New-UDInputField -Type select   -Name Level      -Values @('All','Information','Warning','Error','Critical')
+                New-UDInputField -Type select   -Name MaxEvents  -Values @('50','500','5000','50000')
             } -Validate -Endpoint {
                 param(
                     [Parameter(Mandatory)]
@@ -677,7 +712,13 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
                     $Remotehost,
 
                     [Parameter(Mandatory)]
-                    $Eventlog
+                    $Eventlog,
+
+                    [Parameter(Mandatory)]
+                    $Level,
+
+                    [Parameter(Mandatory)]
+                    $MaxEvents
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
                 # Output a new card based on that info
@@ -693,7 +734,7 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
                             $CardOutput   = "New-PSSession -ComputerName $RemoteHost"
                             $RemoteReturn = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
                             $CardOutput   = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn) -> Eventlog: $($Eventlog)"
-                            $TestReturn   = Get-SCSWindowsEventLog -RemoteSession $rsession -EventlogName $Eventlog
+                            $TestReturn   = Get-SCSWindowsEventLog -RemoteSession $rsession -EventlogName $Eventlog -Level $Level -MaxEvents $MaxEvents
                         }else{
                             $TestReturn = "Session to $Remotehost is $($rsession.State)"
                         }
@@ -738,9 +779,9 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Username     -Placeholder 'username@domain.com'
+                New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
-                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Remote Name or IP Address'
+                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
                 New-UDInputField -Type textbox  -Name RegistryPath -Placeholder 'Registry Path'
             } -Validate -Endpoint {
                 param(
@@ -818,9 +859,9 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Username     -Placeholder 'username@domain.com'
+                New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
-                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Remote Name or IP Address'
+                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
                 New-UDInputField -Type textbox  -Name FilePath     -Placeholder 'File Path'
             } -Validate -Endpoint {
                 param(
@@ -904,9 +945,10 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Username     -Placeholder 'username@domain.com'
+                New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
-                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Remote Name or IP Address'
+                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
+                New-UDInputField -Type select   -Name State        -Values @('All','Running','Stopped')
             } -Validate -Endpoint {
                 param(
                     [Parameter(Mandatory)]
@@ -916,7 +958,10 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
                     $Password, 
 
                     [Parameter(Mandatory)]
-                    $Remotehost
+                    $Remotehost,
+
+                    [Parameter(Mandatory)]
+                    $State
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
                 # Output a new card based on that info
@@ -930,7 +975,7 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
                             $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
-                            $TestResult     = Get-SCSServices -RemoteSession $rsession
+                            $TestResult     = Get-SCSServices -RemoteSession $rsession -State $State
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
                         }
@@ -975,9 +1020,9 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
-                New-UDInputField -Type textbox  -Name Username     -Placeholder 'username@domain.com'
+                New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
-                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Remote Name or IP Address'
+                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
             } -Validate -Endpoint {
                 param(
                     [Parameter(Mandatory)]
@@ -1021,6 +1066,77 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
 
                     New-UDGrid -Title "Windows Processes" -Endpoint {
                         $TestResult | Select-Object ProcessId,Name,WorkingSetSize,VirtualSize,Path,CommandLine | Out-UDGridData
+                    }
+
+                )
+
+            }
+
+        }
+
+    }
+
+}
+#endregion
+
+#region "Windows Feature Tester"
+$Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Content { 
+
+    New-UDLayout -Columns 1 -Content {
+
+        New-UDHeading -Size 4 -Content { "Windows Feature Tester" }
+
+        New-UDHeading -Size 6 -Content { "List Windows Feature from a remote Host" }
+
+        New-UDLayout -Columns 1 -Content {
+            
+            New-UDInput -Title "Remote Information" -Content {
+                New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
+                New-UDInputField -Type password -Name Password     -Placeholder 'Password'
+                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
+            } -Validate -Endpoint {
+                param(
+                    [Parameter(Mandatory)]
+                    $Username, 
+
+                    [Parameter(Mandatory)]
+                    $Password, 
+
+                    [Parameter(Mandatory)]
+                    $Remotehost
+                )
+                Show-UDToast -Message "Send Tests to $Remotehost"
+                # Output a new card based on that info
+
+                try{
+                    $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
+                    if($TestReturn.TcpSucceeded){
+                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
+                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        if($rsession.State -eq 'Opened'){
+                            $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
+                            $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
+                            $TestResult     = Get-SCSWindowsFeature -RemoteSession $rsession
+                        }else{
+                            $CardOutput = "Session to $Remotehost is $($rsession.State)"
+                        }
+                        Remove-PSSession -Session $rsession
+                    }else{
+                        $CardOutput = "Test-PsNetTping -Destination $Remotehost -TcpPort 5985"
+                    }
+                }
+                catch{
+                    $CardOutput = "$($Remotehost): $($_.Exception.Message)"
+                    $Error.Clear()
+                }
+
+                New-UDInputAction -Content @(
+
+                    New-UDCard -Text $CardOutput
+
+                    New-UDGrid -Title "Windows Features" -Endpoint {
+                        $TestResult | Select-Object DisplayName,Name,Installstate | Out-UDGridData
                     }
 
                 )
@@ -1166,9 +1282,10 @@ $Navigation = New-UDSideNav -Content {
         New-UDSideNavItem -Text "Windows Updates"        -PageName "Windows Updates Tester"   -Icon windows
         New-UDSideNavItem -Text "Windows Eventlog"       -PageName "Windows Eventlog Tester"  -Icon windows
         New-UDSideNavItem -Text "Windows Registry"       -PageName "Windows Registry Tester"  -Icon windows
-        New-UDSideNavItem -Text "Windows File Reader"    -PageName "Windows File Reader"      -Icon windows
         New-UDSideNavItem -Text "Windows Services"       -PageName "Windows Service Tester"   -Icon windows
         New-UDSideNavItem -Text "Windows Processes"      -PageName "Windows Process Tester"   -Icon windows
+        New-UDSideNavItem -Text "Windows Features"       -PageName "Windows Feature Tester"   -Icon windows
+        New-UDSideNavItem -Text "Windows File Reader"    -PageName "Windows File Reader"      -Icon windows
     } -Icon windows
 
     if(Get-Module PowerVRA -ListAvailable){
