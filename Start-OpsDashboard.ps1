@@ -225,7 +225,7 @@ function Get-SCSWindowsEventLog{
 
     $ScriptBlockContent = {
         Param($EventlogName)
-        Get-WinEvent -MaxEvents 200 -FilterHashtable @{
+        Get-WinEvent -MaxEvents 2000 -FilterHashtable @{
             Logname   = $EventlogName
             StartTime = (get-date).AddDays(-5)
             EndTime   = get-date
@@ -1171,16 +1171,17 @@ $Navigation = New-UDSideNav -Content {
         New-UDSideNavItem -Text "Windows Processes"      -PageName "Windows Process Tester"   -Icon windows
     } -Icon windows
 
-    #if(Get-Module PowerVRA -ListAvailable){
+    if(Get-Module PowerVRA -ListAvailable){
         New-UDSideNavItem -Text "vRealize Automation" -Children {
             New-UDSideNavItem -Text "Ask for vRAResources" -PageName "vRAResource Tester"   -Icon rocket
         } -Icon cloud
-    #}
+    }
 
-} -Fixed
+} #-Fixed
 
 $Dashboard = New-UDDashboard -Pages $Pages -Navigation $Navigation
 
 Start-UDDashboard -Name "OpsRemoteWinRM" -Endpoint $Endpoint -Dashboard $Dashboard -Port 20001 -AutoReload
 
 Start-Process "http://localhost:20001/Home"
+#endregion
