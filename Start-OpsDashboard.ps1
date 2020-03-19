@@ -329,10 +329,11 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-Get-UDDashboard -Name "OpsRemoteWinRM" | Stop-UDDashboard
-$UDTitle = "Remote Operating"
+$UDTitle = "Remote Operating v0.0.2 - Beta"
 $Pages   = @()
 #endregion
+
+#region content
 
 #region "Home"
 $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content { 
@@ -406,7 +407,7 @@ $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
             ) #-Size small
        }
         
-        New-UDHeading -Size 6 -Content{ "PowerShell Modules: UniversalDashboard.Community, PsNetTools, Universal Dashboard requires .NET Framework version 4.7.2" }
+       "$($UDTitle) | Requirements: UniversalDashboard.Community, PsNetTools, Universal Dashboard requires .NET Framework version 4.7.2"
 
     }
 
@@ -1157,7 +1158,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
 
         New-UDHeading -Size 4 -Content { "vRAResource Tester" }
 
-        New-UDHeading -Size 6 -Content { "List all Windows Virtual Machines for a Tenant" }
+        New-UDHeading -Size 6 -Content { "List all Windows Virtual Machines for a Tenant (e.g. fornax-005)." }
 
         New-UDLayout -Columns 1 -Content {
 
@@ -1166,7 +1167,8 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type select   -Name Environment  -Values @( 'PRD','CAT','INT','DEV')
                 New-UDInputField -Type textbox  -Name Tenant       -Placeholder 'Tenant'
-            } -Validate -Endpoint {
+                New-UDInputField -Type select   -Name OS           -Values @('All','Windows','Linux')
+            } -Endpoint {
                 param(
                     [Parameter(Mandatory)]
                     $Username, 
@@ -1178,7 +1180,10 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     $Environment,
 
                     [Parameter(Mandatory)]
-                    $Tenant
+                    $Tenant,
+
+                    [Parameter(Mandatory)]
+                    $OS
                 )
 
                 try{
@@ -1190,19 +1195,19 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                         'CAT' {$vRAServer = 'cmp.cat.entcloud.swisscom.com'}
                         'PRD' {$vRAServer = 'cmp.entcloud.swisscom.com'}
                     }
-                    $CardOutput = "Environment -> ($Environment), vRA Server -> $($vRAServer), Tenant -> $($Tenant)"
+                    $CardOutput = "Login: Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), -> OS $($OS), -> Username $($Username)"
                     Show-UDToast -Message "Connect-vRAServer -Server $($vRAServer) -Tenant $($Tenant) -Username $($Username)"
                     $connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $Username -Password $secpasswd -SslProtocol Tls12 -IgnoreCertRequirements
                     if($connection){
-                        $vRAResource = Get-vRAResource -Type Machine | Where-Object MachineGuestOperatingSystem -match 'Windows'
+                        switch($OS){
+                            'All'     {$vRAResource = Get-vRAResource -Type Machine}
+                            'Windows' {$vRAResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Windows'}}
+                            'Linux'   {$vRAResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Linux'}}
+                        }
+                        #$vRAResource = Get-vRAResource -Type Machine
                         if($vRAResource){
                             $TestResult = foreach($_ in $vRAResource) { 
                                 if($_.Data.MachineName){
-                                    $ComputerName = $_.Data.'SysPrep.UserData.ComputerName'
-                                    if([String]::IsNullOrEmpty($ComputerName)){
-                                        $ComputerName = $_.Data.MachineName
-                                    }
-                                    $DnsCName = "$($ComputerName).$($_.Data.'Scc.Ms.ResourceDomain')"
                                     [PSCustomObject]@{
                                         VMName           = $_.Data.MachineName
                                         Status           = $_.Status
@@ -1227,14 +1232,12 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                                         IsManaged        = $_.Data.'Scc.Ms.isManaged'
                                         VMTemplate       = $_.Data.'Scc.Ms.Template'
                                         UUID             = $_.Data.'Scc.Vm.Orch.UUID'
-                                        ComputerName     = $ComputerName
+                                        ComputerName     = $_.Data.'SysPrep.UserData.ComputerName'
                                         'DNS-A-Record'   = "$($_.Data.'Scc.Vm.Orch.UUID').sccloudres.net"
-                                        'DNS-CNAME'      = $DnsCName
                                         LastPatched      = $_.Data.'Scc.Ms.LastPatched'
                                         PatchingSuspend  = $_.Data.'Scc.Ms.suspendedPatching'
                                         StorageCluster   = $_.Data.'VirtualMachine.Storage.Cluster.Name'
                                     }
-                                    
                                 }
                             }
                         }
@@ -1248,7 +1251,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     Disconnect-vRAServer -Confirm:$false            
                 }
                 catch{
-                    $CardOutput = "$($vRAServer): $($_.Exception.Message)"
+                    $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), -> Username $($Username): $($_.Exception.Message)"
                     $Error.Clear()
                 }
 
@@ -1256,9 +1259,9 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
 
                     New-UDCard -Text $CardOutput
 
-                    New-UDGrid -Title "vRAResource Tester" -Endpoint {
-                        $TestResult | Select-Object VMName,DateCreated,Owners,BlueprintName,ManagedState,LastPatched,PrimaryIPaddress,SPDNTranslatedIp,Email | Out-UDGridData
-                    }
+                    New-UDGrid -Title "Found $($TestResult.count) Virtual Machines" -Endpoint {
+                        $TestResult | Select-Object VMName,ComputerName,DateCreated,Owners,OS,BlueprintName,ManagedState,LastPatched,PrimaryIPaddress,SPDNTranslatedIp,Email | Out-UDGridData
+                    } -DefaultSortColumn DateCreated -DefaultSortDescending $true
                 )
 
             }
@@ -1268,6 +1271,8 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
     }
 
 }
+#endregion
+
 #endregion
 
 #region Dashboard
@@ -1296,9 +1301,18 @@ $Navigation = New-UDSideNav -Content {
 
 } #-Fixed
 
+#endregion
+
+#region Start
 $Dashboard = New-UDDashboard -Pages $Pages -Navigation $Navigation
 
-Start-UDDashboard -Name "OpsRemoteWinRM" -Endpoint $Endpoint -Dashboard $Dashboard -Port 20001 -AutoReload
-
+if([String]::IsNullOrEmpty((Get-UDDashboard -Name "OpsRemoteWinRM"))){
+    Start-UDDashboard -Name "OpsRemoteWinRM" -Endpoint $Endpoint -Dashboard $Dashboard -Port 20001 -AutoReload
+}
 Start-Process "http://localhost:20001/Home"
+
+<#
+Get-UDDashboard -Name "OpsRemoteWinRM" | Stop-UDDashboard
+#>
+
 #endregion
