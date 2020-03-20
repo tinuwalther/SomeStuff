@@ -329,7 +329,7 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-$UDTitle = "Remote Operating v0.0.2 - Beta"
+$UDTitle = "Remote Operating v0.0.3 - Beta"
 $Pages   = @()
 #endregion
 
@@ -1260,7 +1260,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     New-UDCard -Text $CardOutput
 
                     New-UDGrid -Title "Found $($TestResult.count) Virtual Machines" -Endpoint {
-                        $TestResult | Select-Object VMName,ComputerName,DateCreated,Owners,OS,BlueprintName,ManagedState,LastPatched,PrimaryIPaddress,SPDNTranslatedIp,Email | Out-UDGridData
+                        $TestResult | Select-Object Status,VMName,ComputerName,DateCreated,Owners,OS,BlueprintName,ManagedState,LastPatched,IPv4Address,SPDNTranslatedIp,Email | Out-UDGridData
                     } -DefaultSortColumn DateCreated -DefaultSortDescending $true
                 )
 
