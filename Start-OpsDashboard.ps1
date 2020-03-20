@@ -44,6 +44,101 @@ if(Get-Module psPAS -ListAvailable){
 #endregion
 
 #region functions
+function Get-SccmAgentPatching{
+    [CmdletBinding()]
+    param(
+        $RemoteSession,
+        $RegistryPath,
+        $Property
+    )
+
+    #https://gitlab.swisscloud.io/snippets/160
+    #https://wiki.swisscom.com/display/OUSwindows/SCCM+Agent+Troubleshooting
+    
+    $ScriptBlockContent = {
+        Param($RegistryPath,$Property)
+        Get-ItemPropertyValue -Path $RegistryPath -Name $Property -ErrorAction SilentlyContinue
+    }
+    Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $RegistryPath,$Property
+}
+
+function Get-SccmWUAHandlerLog{
+    [CmdletBinding()]
+    param(
+        $RemoteSession
+    )
+    
+    $ScriptBlockContent = {
+
+        $FoundUpdate     = 'Update \(Missing\)\:\D+'
+        $InstallStated   = 'Async installation of updates started\D+'
+        $InstallFinished = 'Installation of updates completed\D+'
+        
+        $UpdateRegex     = '(?<=^\<\!\[LOG\[\d\.\sUpdate \(Missing\)\:\s)(.*)(?=\]LOG\]\!\>)'
+        $LogRegex        = '(?<=^\<\!\[LOG\[)(.*)(?=\]LOG\]\!\>)'
+        $TimeRegex       = '(?<=\<time=")(.*)(?=" date)'
+        $DateRegex       = '(?<=date=")(.*)(?=" component)'
+
+        $wulog = Get-Content -Path "C:\Windows\CCM\Logs\WUAHandler.log"
+        
+        $wulog | Where {$_ -match $FoundUpdate} | ForEach {
+            $_ -match $UpdateRegex | Out-Null
+            $Log = $Matches[0]
+
+            $_ -match $DateRegex | Out-Null
+            $Date = $Matches[0]
+    
+            $_ -match $TimeRegex | Out-Null
+            $Time = $Matches[0]
+
+            $DateTime = "$($Date) $($Time)"
+    
+            [PSCustomObject]@{
+                Message  = $Log
+                DateTime = $DateTime
+            }
+        }
+
+        $wulog | Where {$_ -match $InstallStated} | ForEach {
+            $_ -match $LogRegex | Out-Null
+            $Log = $Matches[0]
+
+            $_ -match $DateRegex | Out-Null
+            $Date = $Matches[0]
+    
+            $_ -match $TimeRegex | Out-Null
+            $Time = $Matches[0]
+    
+            $DateTime = "$($Date) $($Time)"
+
+            [PSCustomObject]@{
+                Message  = $Log
+                DateTime = $DateTime
+            }
+        }
+
+        $wulog | Where {$_ -match $InstallFinished} | ForEach {
+            $_ -match $LogRegex | Out-Null
+            $Log = $Matches[0]
+
+            $_ -match $DateRegex | Out-Null
+            $Date = $Matches[0]
+    
+            $_ -match $TimeRegex | Out-Null
+            $Time = $Matches[0]
+    
+            $DateTime = "$($Date) $($Time)"
+
+            [PSCustomObject]@{
+                Message  = $Log
+                DateTime = $DateTime
+            }
+        }
+
+    }
+    Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent
+}
+
 function Get-CyberArkPassword{
 
     [CmdletBinding()]
@@ -329,7 +424,7 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-$UDTitle = "Remote Operating v0.0.2 - Beta"
+$UDTitle = "Remote Operating v0.0.5 - Beta"
 $Pages   = @()
 #endregion
 
@@ -405,6 +500,19 @@ $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
             } -Links @(
                 New-UDLink -Text 'Windows File Reader' -Url 'Windows-File-Reader'
             ) #-Size small
+
+            New-UDCard -Title 'SCCM Patching Tester' -Content {
+                New-UDParagraph -Text 'List SCCM Patching properties from a remote host.'
+            } -Links @(
+                New-UDLink -Text 'SCCM Patching Tester' -Url 'SCCM-Patching-Tester'
+            ) #-Size small
+
+            New-UDCard -Title 'vRAResource Tester' -Content {
+                New-UDParagraph -Text 'List vRAResources from a host.'
+            } -Links @(
+                New-UDLink -Text 'Ask for vRAResources' -Url 'vRAResource-Tester'
+            ) #-Size small
+
        }
         
        "$($UDTitle) | Requirements: UniversalDashboard.Community, PsNetTools, Universal Dashboard requires .NET Framework version 4.7.2"
@@ -1080,14 +1188,16 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
 }
 #endregion
 
-#region "Windows Feature Tester"
-$Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Content { 
+#region "SCCM Patching Tester"
+$Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content { 
 
     New-UDLayout -Columns 1 -Content {
 
-        New-UDHeading -Size 4 -Content { "Windows Feature Tester" }
+        New-UDHeading -Size 4 -Content { "SCCM Patching Tester" }
 
-        New-UDHeading -Size 6 -Content { "List Windows Feature from a remote Host" }
+        New-UDHeading -Size 6 -Content { "List SCCM Patching properties from a remote Host" }
+
+        "vRO-Trigger 'HKLM:\Software\Swisscom\SCCM' -Property 'LastPatchRun' should be deleted after patching. SCCM-Trigger 'HKLM:\Software\Swisscom\WindowsUpdate' -Property 'LastPatchRun' must exists after patching."
 
         New-UDLayout -Columns 1 -Content {
             
@@ -1118,7 +1228,33 @@ $Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Conten
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
                             $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
-                            $TestResult     = Get-SCSWindowsFeature -RemoteSession $rsession
+                            
+                            $vRO  = Get-SCSRegistryItem -RemoteSession $rsession -RegistryPath 'HKLM:\Software\Swisscom\SCCM'
+                            if([String]::IsNullOrEmpty($vRO.Value)){
+                                $vRObgcolor = 'lightgreen'
+                            }else{
+                                $vRObgcolor = 'indianred'
+                            }
+
+                            $SCCM = Get-SCSRegistryItem -RemoteSession $rsession -RegistryPath 'HKLM:\Software\Swisscom\WindowsUpdate'
+                            if([String]::IsNullOrEmpty($SCCM.Value)){
+                                $SCCMbgcolor = 'indianred'
+                            }else{
+                                $SCCMbgcolor = 'lightgreen'
+                            }
+
+                            $WSUServerConfiguration  = Get-WsusServer -RemoteSession $rsession
+                            $InstalledWindowsUpdates = Get-InstalledUpdates -RemoteSession $rsession
+                            $MissingWindowsUpdates   = Get-SccmWUAHandlerLog -RemoteSession $rsession
+                            $WindowsUpdateClientLog  = Get-WindowsUpdateClientLog -RemoteSession $rsession
+
+                            $wulog = Get-FileProperties  -RemoteSession $rsession -File "C:\Windows\CCM\Logs\WUAHandler.log"
+                            $WUAHandler = [PSCustomObject]@{
+                                LastWriteTime = $wulog.LastWriteTime
+                                Name          = $wulog.Name
+                                FullName      = $wulog.FullName
+                            }
+
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
                         }
@@ -1136,8 +1272,32 @@ $Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Conten
 
                     New-UDCard -Text $CardOutput
 
-                    New-UDGrid -Title "Windows Features" -Endpoint {
-                        $TestResult | Select-Object DisplayName,Name,Installstate | Out-UDGridData
+                    New-UDGrid -Title "vRO Workflow" -Endpoint {
+                        $vRO | Select-Object Name,Property,Value | Out-UDGridData
+                    } -NoFilter -NoExport -BackgroundColor $vRObgcolor
+
+                    New-UDGrid -Title "SCCM Workflow" -Endpoint {
+                        $SCCM | Select-Object Name,Property,Value | Out-UDGridData
+                    } -NoFilter -NoExport -BackgroundColor $SCCMbgcolor
+
+                    New-UDGrid -Title "Windows Server Update Service" -Endpoint {
+                        $WSUServerConfiguration | Select-Object URI,ServerName,TcpPort,Status | Out-UDGridData
+                    } -NoFilter
+
+                    New-UDGrid -Title "Installed Windows Update" -Endpoint {
+                        $InstalledWindowsUpdates | Select-Object InstalledOn,HotFixID,Description | Out-UDGridData
+                    }
+
+                    New-UDGrid -Title "Windows Update Handlerlog" -Endpoint {
+                        $WUAHandler | Out-UDGridData
+                    } -NoFilter -NoExport
+
+                    New-UDGrid -Title "Content from Windows Update Handlerlog" -Endpoint {
+                        $MissingWindowsUpdates | Select-Object DateTime,Message | Out-UDGridData
+                    } -DefaultSortColumn DateTime -DefaultSortDescending $true
+
+                    New-UDGrid -Title "Windows Update Enventlog" -Endpoint {
+                        $WindowsUpdateClientLog | Select-Object TimeCreated,Id,LevelDisplayName,Message,MachineName,LogName | Out-UDGridData
                     }
 
                 )
@@ -1260,7 +1420,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     New-UDCard -Text $CardOutput
 
                     New-UDGrid -Title "Found $($TestResult.count) Virtual Machines" -Endpoint {
-                        $TestResult | Select-Object VMName,ComputerName,DateCreated,Owners,OS,BlueprintName,ManagedState,LastPatched,PrimaryIPaddress,SPDNTranslatedIp,Email | Out-UDGridData
+                        $TestResult | Select-Object Status,VMName,ComputerName,DateCreated,Owners,OS,BlueprintName,ManagedState,LastPatched,IPv4Address,SPDNTranslatedIp,ExposeToSpdn,Email | Out-UDGridData
                     } -DefaultSortColumn DateCreated -DefaultSortDescending $true
                 )
 
@@ -1291,6 +1451,7 @@ $Navigation = New-UDSideNav -Content {
         New-UDSideNavItem -Text "Windows Processes"      -PageName "Windows Process Tester"   -Icon windows
         New-UDSideNavItem -Text "Windows Features"       -PageName "Windows Feature Tester"   -Icon windows
         New-UDSideNavItem -Text "Windows File Reader"    -PageName "Windows File Reader"      -Icon windows
+        New-UDSideNavItem -Text "SCCM Patching Tester"   -PageName "SCCM Patching Tester"     -Icon windows
     } -Icon windows
 
     if(Get-Module PowerVRA -ListAvailable){
