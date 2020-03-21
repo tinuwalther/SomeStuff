@@ -424,7 +424,7 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-$UDTitle = "Remote Operating - v0.0.6-beta"
+$UDTitle = "Remote Operating - v0.0.7-beta"
 $Pages   = @()
 #endregion
 
@@ -566,8 +566,11 @@ $Pages += New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Conten
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the Fully Qualified Name or IP Address of the remote host and press Submit"
+                New-UDHtml 'Enter the Fully Qualified Name or IP Address of the remote host to test the name resolution, and press Submit'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -619,8 +622,12 @@ $Pages += New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the Fully Qualified Name or IP Address of the remote host, the TCP Port to test and press Submit"
+                New-UDHtml 'Enter the Fully Qualified Name or IP Address of the remote host, the TCP port to test and press Submit'
+                New-UDHtml 'TCP port examples: SSH = 22, SMTP = 25, HTTP = 80, HTTPS = 443, LDAP = 389, LDAPS = 636, RDP = 3389, WinRM-HTTP = 5985, WinRM-HTTPS = 5986'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -680,8 +687,11 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+                New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -764,8 +774,11 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+                New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -860,8 +873,11 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+                New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, enter an Eventlog (e.g. Application, System, Security), choose a Level (e.g. Information, Warning, Error), choose MaxEvents and press Submit'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -950,8 +966,11 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+                New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, enter a Registry path (e.g. HKLM:\Software\Microsoft), and press Submit'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -1037,8 +1056,11 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+                New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, enter a path of a file to read from, and press Submit'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -1130,8 +1152,11 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+                New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, choose a Service state (Running, Stopped),  and press Submit'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -1213,8 +1238,11 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+                New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -1283,6 +1311,85 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
 }
 #endregion
 
+#region "Windows Feature Tester"
+$Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Content { 
+
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
+            }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
+        }
+    }
+    New-UDLayout -Columns 1 -Content {
+
+        New-UDHeading -Size 4 -Content { "Windows Feature Tester" }
+
+        New-UDHeading -Size 6 -Content { "List installed Windows Feature from a remote Host" }
+
+        New-UDLayout -Columns 1 -Content {
+            
+            New-UDInput -Title "Remote Information" -Content {
+                New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
+                New-UDInputField -Type password -Name Password     -Placeholder 'Password'
+                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
+            } -Validate -Endpoint {
+                param(
+                    [Parameter(Mandatory)]
+                    $Username, 
+
+                    [Parameter(Mandatory)]
+                    $Password, 
+
+                    [Parameter(Mandatory)]
+                    $Remotehost
+                )
+                Show-UDToast -Message "Send Tests to $Remotehost"
+                try{
+                    $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
+                    if($TestReturn.TcpSucceeded){
+                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
+                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        if($rsession.State -eq 'Opened'){
+                            $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
+                            $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
+                            $TestResult     = Get-SCSWindowsFeature -RemoteSession $rsession
+                        }else{
+                            $CardOutput = "Session to $Remotehost is $($rsession.State)"
+                        }
+                        Remove-PSSession -Session $rsession
+                    }else{
+                        $CardOutput = "Test-PsNetTping -Destination $Remotehost -TcpPort 5985"
+                    }
+                }
+                catch{
+                    $CardOutput = "$($Remotehost): $($_.Exception.Message)"
+                    $Error.Clear()
+                }
+                New-UDInputAction -Content @(
+
+                    New-UDCard -Text "Filter: $($CardOutput)"
+                    New-UDGrid -Title "Windows Features" -Endpoint {
+                        $TestResult | Select-Object DisplayName,Name,Installstate | Out-UDGridData
+                    }
+
+                )
+
+            }
+
+        }
+
+    }
+
+}
+#endregion
+
 #region "SCCM Patching Tester"
 $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content { 
 
@@ -1291,8 +1398,11 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+                New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -1301,7 +1411,7 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
 
         New-UDHeading -Size 6 -Content { "List SCCM Patching properties from a remote Host" }
 
-        "vRO-Trigger 'HKLM:\Software\Swisscom\SCCM' -Property 'LastPatchRun' should be deleted after patching. SCCM-Trigger 'HKLM:\Software\Swisscom\WindowsUpdate' -Property 'LastPatchRun' must exists after patching."
+        New-UDHtml "The vRO-Trigger 'HKLM:\Software\Swisscom\SCCM' -Property 'LastPatchRun' should be deleted after patching and the SCCM-Trigger 'HKLM:\Software\Swisscom\WindowsUpdate' -Property 'LastPatchRun' must exists after patching."
 
         New-UDLayout -Columns 1 -Content {
             
@@ -1424,8 +1534,11 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml "Enter the username and password for the Tenant-login, choose the environemnt, enter the Tenant and press Submit"
+                New-UDHtml 'Enter the Username and Password for the Tenant-login, choose an Environment (e.g. DEV, INT, CAT, or PRD), enter a Tenant name (e.g. fornax-005), choose an OS (e.g. All, Windows, Linux), and press Submit'
             }
+        }
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -1584,7 +1697,10 @@ $Navigation = New-UDSideNav -Content {
 #endregion
 
 #region Start
-$Dashboard = New-UDDashboard -Pages $Pages -Navigation $Navigation
+$Footer = New-UDFooter -Links @(
+    New-UDLink -Text ", from Ironman Software" -Url "https://ironmansoftware.com"
+)
+$Dashboard = New-UDDashboard -Pages $Pages -Navigation $Navigation -Footer $Footer
 
 if([String]::IsNullOrEmpty((Get-UDDashboard -Name "OpsRemoteWinRM"))){
     Start-UDDashboard -Name "OpsRemoteWinRM" -Endpoint $Endpoint -Dashboard $Dashboard -Port 20001 -AutoReload
