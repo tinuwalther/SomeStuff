@@ -22,7 +22,7 @@ if(Get-Module PsNetTools -ListAvailable){
         Import-Module PsNetTools
     }
 }else{
-    "PowerShell Module PsNetTools not found, download it from https://github.com/tinuwalther/PsNetTools"
+    "PowerShell Module PsNetTools not found, download it from https://github.com/tinuwalther/PsNetTools/releases/download/v0.7.5/PsNetTools.zip"
     exit -1
 }
 
@@ -39,7 +39,7 @@ if(Get-Module psPAS -ListAvailable){
         Import-Module psPAS
     }
 }else{
-    "PowerShell Module psPAS not found, Install-Module -Name psPAS"
+    #"PowerShell Module psPAS not found, Install-Module -Name psPAS"
 }
 #endregion
 
@@ -81,7 +81,7 @@ function Get-SccmWUAHandlerLog{
 
         $wulog = Get-Content -Path "C:\Windows\CCM\Logs\WUAHandler.log"
         
-        $wulog | Where {$_ -match $FoundUpdate} | ForEach {
+        $wulog | Where-Object {$_ -match $FoundUpdate} | ForEach-Object {
             $_ -match $UpdateRegex | Out-Null
             $Log = $Matches[0]
 
@@ -99,7 +99,7 @@ function Get-SccmWUAHandlerLog{
             }
         }
 
-        $wulog | Where {$_ -match $InstallStated} | ForEach {
+        $wulog | Where-Object {$_ -match $InstallStated} | ForEach-Object {
             $_ -match $LogRegex | Out-Null
             $Log = $Matches[0]
 
@@ -117,7 +117,7 @@ function Get-SccmWUAHandlerLog{
             }
         }
 
-        $wulog | Where {$_ -match $InstallFinished} | ForEach {
+        $wulog | Where-Object {$_ -match $InstallFinished} | ForEach-Object {
             $_ -match $LogRegex | Out-Null
             $Log = $Matches[0]
 
@@ -424,7 +424,7 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-$UDTitle = "Remote Operating v0.0.5 - Beta"
+$UDTitle = "Remote Operating - v0.0.6-beta"
 $Pages   = @()
 #endregion
 
@@ -496,7 +496,7 @@ $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
             ) #-Size small
  
             New-UDCard -Title 'Windows File Reader' -Content {
-                New-UDParagraph -Text 'List file properties and the file content from a remote host.'
+                New-UDParagraph -Text 'List file content from a remote host.'
             } -Links @(
                 New-UDLink -Text 'Windows File Reader' -Url 'Windows-File-Reader'
             ) #-Size small
@@ -508,14 +508,50 @@ $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
             ) #-Size small
 
             New-UDCard -Title 'vRAResource Tester' -Content {
-                New-UDParagraph -Text 'List vRAResources from a host.'
+                New-UDParagraph -Text 'List resources of a Virtual Machine from vRA.'
             } -Links @(
                 New-UDLink -Text 'Ask for vRAResources' -Url 'vRAResource-Tester'
             ) #-Size small
 
        }
-        
-       "$($UDTitle) | Requirements: UniversalDashboard.Community, PsNetTools, Universal Dashboard requires .NET Framework version 4.7.2"
+
+    }
+}
+#endregion
+
+#region "Getting Started"
+$Pages += New-UDPage -Name "Getting Started" -Title "$($UDTitle)" -Content { 
+
+    New-UDLayout -Columns 1 -Content {
+
+        New-UDHeading -Size 4 -Content { "Getting Started" }
+        "This Dashboard is written in PowerShell by Martin Walther, Swisscom (Schweiz) AG to simplify operating taks."
+
+        New-UDHeading -Size 5 -Content { "Requirements" }
+
+        New-UDHeading -Size 6 -Content { "PowerShell Universal Dashboard" }
+        "Universal Dashboard is a cross-platform PowerShell module for developing and hosting web-based, interactive dashboards, websites and REST APIs."
+        New-UDLayout -Columns 1 -Content {           
+            New-UDCard -Text "Install-Module UniversalDashboard.Community -AcceptLicense -Force" -Links @(
+                New-UDLink -Url https://ironmansoftware.com/powershell-universal-dashboard/ -Text "Universal Dashboard"
+            )
+        }
+
+        New-UDHeading -Size 6 -Content { "PowerShell PSNetTools" }
+        "PsNetTools is a cross platform PowerShell module to test network features on Windows, Mac and Linux."
+        New-UDLayout -Columns 1 -Content {           
+            New-UDCard -Text "Download and install PsNetTools from github.com"-Links @(
+                New-UDLink -Url https://github.com/tinuwalther/PsNetTools/releases/download/v0.7.5/PsNetTools.zip -Text "Download PsNetTools"
+            )
+        }
+
+        New-UDHeading -Size 6 -Content { "PowerShell PowervRA" }
+        "PowervRA is a PowerShell module built on top of the services exposed by the vRealize Automation 7 REST API."
+        New-UDLayout -Columns 1 -Content {           
+            New-UDCard -Text "Install-Module PowervRA" -Links @(
+                New-UDLink -Url https://powervra.readthedocs.io/en/latest/ -Text "PowervRA"
+            )
+        }
 
     }
 
@@ -525,12 +561,19 @@ $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
 #region "Name Resolution Tester"
 $Pages += New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the Fully Qualified Name or IP Address of the remote host and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Name Resolution Tester" }
-
         New-UDHeading -Size 6 -Content { "Test the Forwardlookup to a remote host" }
-
         New-UDLayout -Columns 1 -Content {
             
             New-UDInput -Title "Remote Information" -Content {
@@ -540,9 +583,7 @@ $Pages += New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Conten
                     [Parameter(Mandatory)]
                     $Remotehost
                 )
-
                 Show-UDToast -Message "Send Tests to $Remotehost" -Balloon
-
                 try{
                     $TestReturn = Test-PsNetDig -Destination $Remotehost
                     $CardOutput = "Test-PsNetDig -Destination $Remotehost"
@@ -551,10 +592,9 @@ $Pages += New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Conten
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
                     $Error.Clear()
                 }
-
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title "Details" -Endpoint {
                         $TestReturn | Out-UDGridData
@@ -574,6 +614,15 @@ $Pages += New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Conten
 #region "Connectivity Tester"
 $Pages += New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the Fully Qualified Name or IP Address of the remote host, the TCP Port to test and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Connectivity Tester" }
@@ -595,9 +644,7 @@ $Pages += New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content {
                     [ValidateRange(0,65535)]
                     [Int32]$Remoteport
                 )
-
                 Show-UDToast -Message "Send Tests to $Remotehost" -Balloon
-
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort $Remoteport
                     $CardOutput = "Test-PsNetTping -Destination $Remotehost -TcpPort $Remoteport"    
@@ -606,10 +653,9 @@ $Pages += New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content {
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
                     $Error.Clear()
                 }
-
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title "Details" -Endpoint {
                         $TestReturn | Out-UDGridData
@@ -629,6 +675,15 @@ $Pages += New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content {
 #region "Access Tester"
 $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Access Tester" }
@@ -653,8 +708,6 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
                     $Remotehost
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
-                # Output a new card based on that info
-
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
@@ -684,10 +737,9 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
                     $Error.Clear()
                 }
-
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title "Details" -Endpoint {
                         $TestReturn | Out-UDGridData
@@ -707,6 +759,15 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
 #region "Windows Update Tester"
 $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Updates Tester" }
@@ -731,8 +792,6 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
                     $Remotehost
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
-                # Output a new card based on that info
-
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
@@ -740,9 +799,13 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
                         $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
                         $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
                         if($rsession.State -eq 'Opened'){
+                            Show-UDToast -Message "Collect data from registry"
                             $WSUServerConfiguration  = Get-WsusServer -RemoteSession $rsession
+                            Show-UDToast -Message "Collect installed Windows Update"
                             $InstalledWindowsUpdates = Get-InstalledUpdates -RemoteSession $rsession
+                            Show-UDToast -Message "Collect missing Windows Update"
                             $MissingWindowsUpdates   = Get-MissingUpdates -RemoteSession $rsession
+                            Show-UDToast -Message "Collect data from Windows Update Clientlog"
                             $WindowsUpdateClientLog  = Get-WindowsUpdateClientLog -RemoteSession $rsession
                             $CardOutput = "Input: $($Remotehost) -> ComputerName: $(Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME})"
 
@@ -756,13 +819,11 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
                 }
                 catch{
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
-                    $LinkText   = "Error in Test"
                     $Error.Clear()
                 }
-
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput #'https://www.catalog.update.microsoft.com/Home.aspx'
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title "Windows Server Update Service" -Endpoint {
                         $WSUServerConfiguration | Select-Object URI,ServerName,TcpPort,Status | Out-UDGridData
@@ -770,7 +831,7 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
 
                     New-UDGrid -Title "Installed Windows Update" -Endpoint {
                         $InstalledWindowsUpdates | Select-Object InstalledOn,HotFixID,Description | Out-UDGridData
-                    }
+                    } -Links @(New-UDLink -Url https://www.catalog.update.microsoft.com/Home.aspx -Text "Microsoft Update Catalog")
 
                     New-UDGrid -Title "Missing Windows Update" -Endpoint {
                         $MissingWindowsUpdates | Select-Object Id,KBs,Categories,Title,Description,Mandatory,Present | Out-UDGridData
@@ -794,6 +855,15 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
 #region "Windows Eventlog Tester"
 $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Eventlog Tester" }
@@ -830,8 +900,6 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
                     $MaxEvents
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
-                # Output a new card based on that info
-
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
@@ -840,9 +908,8 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
                         $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput   = "New-PSSession -ComputerName $RemoteHost"
-                            $RemoteReturn = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput   = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn) -> Eventlog: $($Eventlog)"
+                            $CardOutput   = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn) -> Eventlog: $($Eventlog) -> Level: $($Level) -> MaxEvents: $($MaxEvents)"
+                            Show-UDToast -Message "Collect data"
                             $TestReturn   = Get-SCSWindowsEventLog -RemoteSession $rsession -EventlogName $Eventlog -Level $Level -MaxEvents $MaxEvents
                         }else{
                             $TestReturn = "Session to $Remotehost is $($rsession.State)"
@@ -856,10 +923,9 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
                     $Error.Clear()
                 }
-
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title $Eventlog -Endpoint {
                         $TestReturn | Select-Object TimeCreated,Id,LevelDisplayName,Message,ProviderName | Out-UDGridData
@@ -879,6 +945,15 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
 #region "Registry Tester"
 $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Registry Tester" }
@@ -907,8 +982,6 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
                     $RegistryPath
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
-                # Output a new card based on that info
-
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
@@ -918,6 +991,7 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn      = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
                             $CardOutput        = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn) -> $($RegistryPath)"
+                            Show-UDToast -Message "Collect data"
                             $RegistryItem      = Get-SCSRegistryItem -RemoteSession $rsession -RegistryPath $RegistryPath
                             $RegistryChildItem = Get-SCSRegistryChildItem -RemoteSession $rsession -RegistryPath $RegistryPath
                         }else{
@@ -932,10 +1006,9 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
                     $Error.Clear()
                 }
-
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title "Items" -Endpoint {
                         $RegistryItem | Select-Object Name,Property,Value | Out-UDGridData
@@ -959,6 +1032,15 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
 #region "File Reader"
 $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows File Reader" }
@@ -987,8 +1069,6 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
                     $FilePath
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
-                # Output a new card based on that info
-
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
@@ -998,6 +1078,7 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
                             $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn) -> $($FilePath)"
+                            Show-UDToast -Message "Collect data"
                             $FileProperties = Get-FileProperties -RemoteSession $rsession -File $FilePath
                             $FileContent    = Get-FileContent    -RemoteSession $rsession -File $FilePath
                         }else{
@@ -1012,10 +1093,9 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
                     $Error.Clear()
                 }
-
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title "File properties" -Endpoint {
                         $FileProperties | Select-Object Name,FullName,LastWriteTime | Out-UDGridData
@@ -1045,6 +1125,15 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
 #region "Windows Service Tester"
 $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Service Tester" }
@@ -1073,8 +1162,6 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
                     $State
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
-                # Output a new card based on that info
-
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
@@ -1084,6 +1171,7 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
                             $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
+                            Show-UDToast -Message "Collect data"
                             $TestResult     = Get-SCSServices -RemoteSession $rsession -State $State
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
@@ -1100,7 +1188,7 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
 
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title "Windows Services" -Endpoint {
                         $TestResult | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName | Out-UDGridData
@@ -1120,6 +1208,15 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
 #region "Windows Process Tester"
 $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Process Tester" }
@@ -1144,8 +1241,6 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
                     $Remotehost
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
-                # Output a new card based on that info
-
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
@@ -1155,6 +1250,7 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
                             $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
+                            Show-UDToast -Message "Collect data"
                             $TestResult     = Get-SCSProcesses -RemoteSession $rsession
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
@@ -1168,10 +1264,9 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
                     $Error.Clear()
                 }
-
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title "Windows Processes" -Endpoint {
                         $TestResult | Select-Object ProcessId,Name,WorkingSetSize,VirtualSize,Path,CommandLine | Out-UDGridData
@@ -1191,6 +1286,15 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
 #region "SCCM Patching Tester"
 $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the username and password, the Fully Qualified Name or IP Address of the remote host and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "SCCM Patching Tester" }
@@ -1217,8 +1321,6 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                     $Remotehost
                 )
                 Show-UDToast -Message "Send Tests to $Remotehost"
-                # Output a new card based on that info
-
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
@@ -1229,6 +1331,7 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
                             $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
                             
+                            Show-UDToast -Message "Collect data from registry"
                             $vRO  = Get-SCSRegistryItem -RemoteSession $rsession -RegistryPath 'HKLM:\Software\Swisscom\SCCM'
                             if([String]::IsNullOrEmpty($vRO.Value)){
                                 $vRObgcolor = 'lightgreen'
@@ -1244,16 +1347,19 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                             }
 
                             $WSUServerConfiguration  = Get-WsusServer -RemoteSession $rsession
-                            $InstalledWindowsUpdates = Get-InstalledUpdates -RemoteSession $rsession
-                            $MissingWindowsUpdates   = Get-SccmWUAHandlerLog -RemoteSession $rsession
-                            $WindowsUpdateClientLog  = Get-WindowsUpdateClientLog -RemoteSession $rsession
 
+                            Show-UDToast -Message "Collect installed Windows Updates"
+                            $InstalledWindowsUpdates = Get-InstalledUpdates -RemoteSession $rsession
+                            Show-UDToast -Message "Collect data from WUAHandlerLog"
                             $wulog = Get-FileProperties  -RemoteSession $rsession -File "C:\Windows\CCM\Logs\WUAHandler.log"
                             $WUAHandler = [PSCustomObject]@{
                                 LastWriteTime = $wulog.LastWriteTime
                                 Name          = $wulog.Name
                                 FullName      = $wulog.FullName
                             }
+                            $MissingWindowsUpdates   = Get-SccmWUAHandlerLog -RemoteSession $rsession
+                            Show-UDToast -Message "Collect data from Windows Update Clientlog"
+                            $WindowsUpdateClientLog  = Get-WindowsUpdateClientLog -RemoteSession $rsession
 
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
@@ -1267,10 +1373,9 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                     $CardOutput = "$($Remotehost): $($_.Exception.Message)"
                     $Error.Clear()
                 }
-
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title "vRO Workflow" -Endpoint {
                         $vRO | Select-Object Name,Property,Value | Out-UDGridData
@@ -1314,6 +1419,15 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
 #region "vRAResource Tester"
 $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml "Enter the username and password for the Tenant-login, choose the environemnt, enter the Tenant and press Submit"
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "vRAResource Tester" }
@@ -1355,7 +1469,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                         'CAT' {$vRAServer = 'cmp.cat.entcloud.swisscom.com'}
                         'PRD' {$vRAServer = 'cmp.entcloud.swisscom.com'}
                     }
-                    $CardOutput = "Login: Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), -> OS $($OS), -> Username $($Username)"
+                    $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), -> OS $($OS), -> Username $($Username)"
                     Show-UDToast -Message "Connect-vRAServer -Server $($vRAServer) -Tenant $($Tenant) -Username $($Username)"
                     $connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $Username -Password $secpasswd -SslProtocol Tls12 -IgnoreCertRequirements
                     if($connection){
@@ -1364,7 +1478,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                             'Windows' {$vRAResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Windows'}}
                             'Linux'   {$vRAResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Linux'}}
                         }
-                        #$vRAResource = Get-vRAResource -Type Machine
+                        Show-UDToast -Message "Collect data from resources"
                         if($vRAResource){
                             $TestResult = foreach($_ in $vRAResource) { 
                                 if($_.Data.MachineName){
@@ -1414,10 +1528,9 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), -> Username $($Username): $($_.Exception.Message)"
                     $Error.Clear()
                 }
-
                 New-UDInputAction -Content @(
 
-                    New-UDCard -Text $CardOutput
+                    New-UDCard -Text "Filter: $($CardOutput)"
 
                     New-UDGrid -Title "Found $($TestResult.count) Virtual Machines" -Endpoint {
                         $TestResult | Select-Object Status,VMName,ComputerName,DateCreated,Owners,OS,BlueprintName,ManagedState,LastPatched,IPv4Address,SPDNTranslatedIp,ExposeToSpdn,Email | Out-UDGridData
@@ -1438,12 +1551,18 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
 #region Dashboard
 $Navigation = New-UDSideNav -Content {
     
-    New-UDSideNavItem -Text "Home"                   -PageName "Home"                     -Icon home 
-    New-UDSideNavItem -Text "Name Resolution Tester" -PageName "Name Resolution Tester"   -Icon rocket 
-    New-UDSideNavItem -Text "Connectivity Tester"    -PageName "Connectivity Tester"      -Icon rocket 
-    New-UDSideNavItem -Text "Access Tester"          -PageName "Access Tester"            -Icon rocket
+    New-UDSideNavItem -Text "Home" -PageName "Home"                     -Icon home 
+    New-UDSideNavItem -Text "About" -Children {
+        New-UDSideNavItem -Text "Getting Started" -PageName "Getting Started" -Icon list
+    } -Icon info
+
+    New-UDSideNavItem -Text "Network" -Children {
+        New-UDSideNavItem -Text "Name Resolution Tester" -PageName "Name Resolution Tester"   -Icon rocket 
+        New-UDSideNavItem -Text "Connectivity Tester"    -PageName "Connectivity Tester"      -Icon rocket 
+    } -Icon rocket
     
-    New-UDSideNavItem -Text "Windows" -Children {
+    New-UDSideNavItem -Text "Workload" -Children {
+        New-UDSideNavItem -Text "Access Tester"          -PageName "Access Tester"            -Icon windows
         New-UDSideNavItem -Text "Windows Updates"        -PageName "Windows Updates Tester"   -Icon windows
         New-UDSideNavItem -Text "Windows Eventlog"       -PageName "Windows Eventlog Tester"  -Icon windows
         New-UDSideNavItem -Text "Windows Registry"       -PageName "Windows Registry Tester"  -Icon windows
@@ -1452,7 +1571,7 @@ $Navigation = New-UDSideNav -Content {
         New-UDSideNavItem -Text "Windows Features"       -PageName "Windows Feature Tester"   -Icon windows
         New-UDSideNavItem -Text "Windows File Reader"    -PageName "Windows File Reader"      -Icon windows
         New-UDSideNavItem -Text "SCCM Patching Tester"   -PageName "SCCM Patching Tester"     -Icon windows
-    } -Icon windows
+    } -Icon server
 
     if(Get-Module PowerVRA -ListAvailable){
         New-UDSideNavItem -Text "vRealize Automation" -Children {
