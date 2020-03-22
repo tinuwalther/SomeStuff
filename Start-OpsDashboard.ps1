@@ -1,10 +1,5 @@
 <#
-
-    https://ironmansoftware.com/universal-dashboard-2-6-beautification-ws-fed-and-bounty-hunters/
-    Universal Dashboard requires .NET Framework version 4.7.2
-
-    localhost:20001
-
+    Remote Operating runs as an ASP.NET web service on http://localhost:20001
 #>
 
 #region PowerShell Modules
@@ -44,22 +39,70 @@ if(Get-Module psPAS -ListAvailable){
 #endregion
 
 #region functions
-function Get-SccmAgentPatching{
+
+function Send-RemoteOperatingMail{
+    $Sender      = 'user01@swisscom.com'
+    $Receipient  = 'martin.walther@swisscom.com'
+    switch($Computername){
+        'admin' {$SmtpServer  = "psrvcm02mxr0001.sccloudinfra.net"} #Service Tier 2
+        default {$SmtpServer  = "psrvcm02mxr0002.sccloudinfra.net"} #Service Tier 1
+    }
+    $Subject     = $UDTitle
+    $BodyMessage = "
+Hello
+
+This is a Mail-Notification from $($Computername):
+
+$MailMessage
+
+Regards
+$($Sender)
+   "
+    #Send-MailMessage -From $Sender -To $Receipient -SmtpServer $SmtpServer -Subject $Subject -Body $BodyMessage
+}
+
+function Get-SccmAgent{
     [CmdletBinding()]
     param(
         $RemoteSession,
-        $RegistryPath,
-        $Property
+        $SoftwareName
     )
-
-    #https://gitlab.swisscloud.io/snippets/160
-    #https://wiki.swisscom.com/display/OUSwindows/SCCM+Agent+Troubleshooting
-    
     $ScriptBlockContent = {
-        Param($RegistryPath,$Property)
-        Get-ItemPropertyValue -Path $RegistryPath -Name $Property -ErrorAction SilentlyContinue
+        Param($SoftwareName)
+        $Software = (Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*) | Where-Object DisplayName -match $SoftwareName
+        if([String]::IsNullOrEmpty($software)){
+            [PSCustomObject]@{}
+        }else{
+            [PSCustomObject]@{
+                Name             = $Software.DisplayName
+                Version          = $Software.DisplayVersion
+                Publisher        = $Software.Publisher
+                InstallDate      = $Software.InstallDate
+            }
+        }
     }
-    Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $RegistryPath,$Property
+    Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $SoftwareName
+}
+
+function Get-SccmService{
+    [CmdletBinding()]
+    param(
+        $RemoteSession,
+        $ServiceName
+    )
+    $ScriptBlockContent = {
+        Param($ServiceName)
+        Get-CimInstance win32_service | Where-Object Name -match $ServiceName | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName
+        <#
+        $CcmExec = Get-Service -Name $ServiceName
+        [PSCustomObject]@{
+            Name      = $CcmExec.DisplayName
+            Status    = $CcmExec.Status
+            StartType = $CcmExec.StartType
+        }
+        #>
+    }
+    Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $ServiceName
 }
 
 function Get-SccmWUAHandlerLog{
@@ -409,6 +452,46 @@ function Get-SCSRegistryChildItem{
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $RegistryPath
 }
 
+function Get-vRaResourceData{
+    [CmdletBinding()]
+    param(
+        $Resource
+    )
+    foreach($_ in $Resource) { 
+        if($_.Data.MachineName){
+            [PSCustomObject]@{
+                VMName           = $_.Data.MachineName
+                Status           = $_.Status
+                Owners           = $_.Owners
+                Email            = $_.Data.'Scc.Ms.technicalContactEmail'
+                TenantId         = $_.TenantId
+                DateCreated      = (Get-Date ($_.DateCreated))
+                LastUpdated      = (Get-Date ($_.LastUpdated))
+                BlueprintName    = $_.Data.MachineBlueprintName
+                OS               = $_.Data.MachineGuestOperatingSystem
+                Memory           = $_.Data.MachineMemory
+                CPU              = $_.Data.MachineCPU
+                TotalStorage     = $_.Data.MachineStorage
+                ExposeToSpdn     = $_.Data.'Scc.Vm.Orch.ExposeToSpdn'
+                ResourceDomain   = $_.Data.'Scc.Ms.ResourceDomain'
+                PrimaryIPaddress = $_.data.__datacollected_ipaddress
+                IPv4Address      = $_.data.NETWORK_LIST.data.NETWORK_ADDRESS
+                MACAddress       = $_.data.NETWORK_LIST.data.NETWORK_MAC_ADDRESS
+                SPDNTranslatedIp = $_.Data.'Scc.Vm.Orch.spdnTranslatedIp'
+                PatchingWindow   = $_.Data.'Scc.Ms.PatchingWindow'
+                ManagedState     = $_.Data.'Scc.Ms.State'
+                IsManaged        = $_.Data.'Scc.Ms.isManaged'
+                VMTemplate       = $_.Data.'Scc.Ms.Template'
+                UUID             = $_.Data.'Scc.Vm.Orch.UUID'
+                ComputerName     = $_.Data.'SysPrep.UserData.ComputerName'
+                LastPatched      = $_.Data.'Scc.Ms.LastPatched'
+                PatchingSuspend  = $_.Data.'Scc.Ms.suspendedPatching'
+                StorageCluster   = $_.Data.'VirtualMachine.Storage.Cluster.Name'
+            }
+        }
+    }
+}
+
 function Invoke-SCSScriptBlock{
     [CmdletBinding()]
     param(
@@ -424,7 +507,7 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-$UDTitle = "Remote Operating - v0.0.7-beta"
+$UDTitle = "Remote Operating - v0.0.10-beta"
 $Pages   = @()
 #endregion
 
@@ -433,10 +516,20 @@ $Pages   = @()
 #region "Home"
 $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "There is no Help available"
+            } -BottomSheet -Content {
+                #New-UDHtml 'There is no Help available'
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
-
         New-UDHeading -Size 4 -Content { "The web framework for PowerShell remote operating" }
-
         New-UDHeading -Size 6 -Content{ "This is the web-based, interactive dashboard for remote operation tasks over WinRM. The following listet features are implemented:" }
 
         New-UDLayout -Columns 3 -Content {
@@ -501,20 +594,26 @@ $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
                 New-UDLink -Text 'Windows File Reader' -Url 'Windows-File-Reader'
             ) #-Size small
 
+            New-UDCard -Title 'SCCM Agent Tester' -Content {
+                New-UDParagraph -Text 'List SCCM Agent properties from a remote host.'
+            } -Links @(
+                New-UDLink -Text 'SCCM Agent Tester' -Url 'SCCM-Agent-Tester'
+            ) #-Size small
+
             New-UDCard -Title 'SCCM Patching Tester' -Content {
                 New-UDParagraph -Text 'List SCCM Patching properties from a remote host.'
             } -Links @(
                 New-UDLink -Text 'SCCM Patching Tester' -Url 'SCCM-Patching-Tester'
             ) #-Size small
 
-            New-UDCard -Title 'vRAResource Tester' -Content {
-                New-UDParagraph -Text 'List resources of a Virtual Machine from vRA.'
-            } -Links @(
-                New-UDLink -Text 'Ask for vRAResources' -Url 'vRAResource-Tester'
-            ) #-Size small
-
+            if(Get-Module PowerVRA -ListAvailable){
+                New-UDCard -Title 'vRAResource Tester' -Content {
+                    New-UDParagraph -Text 'List resources of a Virtual Machine from vRA.'
+                } -Links @(
+                    New-UDLink -Text 'Ask for vRAResources' -Url 'vRAResource-Tester'
+                ) #-Size small
+            }
        }
-
     }
 }
 #endregion
@@ -522,15 +621,29 @@ $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
 #region "Getting Started"
 $Pages += New-UDPage -Name "Getting Started" -Title "$($UDTitle)" -Content { 
 
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "There is no Help available"
+            } -BottomSheet -Content {
+                #New-UDHtml 'There is no Help available'
+            }
+        }
+    }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Getting Started" }
-        "This Dashboard is written in PowerShell by Martin Walther, Swisscom (Schweiz) AG to simplify operating taks."
+        New-UDHtml "This Dashboard is written in PowerShell by Martin Walther, Swisscom (Schweiz) AG to simplify operating taks."
 
         New-UDHeading -Size 5 -Content { "Requirements" }
 
         New-UDHeading -Size 6 -Content { "PowerShell Universal Dashboard" }
-        "Universal Dashboard is a cross-platform PowerShell module for developing and hosting web-based, interactive dashboards, websites and REST APIs."
+        New-UDHtml "Universal Dashboard is a cross-platform PowerShell module for developing and hosting web-based, interactive dashboards, websites and REST APIs with an ASP.NET web service."
+        New-UDHtml 'Universal Dashboard requires .NET Framework version 4.7.2, <a href="https://dotnet.microsoft.com/download/dotnet-framework/net472">download .NET Framework 4.7.2</a>'
+        
         New-UDLayout -Columns 1 -Content {           
             New-UDCard -Text "Install-Module UniversalDashboard.Community -AcceptLicense -Force" -Links @(
                 New-UDLink -Url https://ironmansoftware.com/powershell-universal-dashboard/ -Text "Universal Dashboard"
@@ -554,7 +667,6 @@ $Pages += New-UDPage -Name "Getting Started" -Title "$($UDTitle)" -Content {
         }
 
     }
-
 }
 #endregion
 
@@ -562,15 +674,15 @@ $Pages += New-UDPage -Name "Getting Started" -Title "$($UDTitle)" -Content {
 $Pages += New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
                 New-UDHtml 'Enter the Fully Qualified Name or IP Address of the remote host to test the name resolution, and press Submit'
             }
-        }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
@@ -596,21 +708,15 @@ $Pages += New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Conten
                     $Error.Clear()
                 }
                 New-UDInputAction -Content @(
-
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title "Details" -Endpoint {
                         $TestReturn | Out-UDGridData
                     }
-                    
                 )
 
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -618,6 +724,9 @@ $Pages += New-UDPage -Name "Name Resolution Tester" -Title "$($UDTitle)" -Conten
 $Pages += New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
@@ -626,14 +735,10 @@ $Pages += New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content {
                 New-UDHtml 'TCP port examples: SSH = 22, SMTP = 25, HTTP = 80, HTTPS = 443, LDAP = 389, LDAPS = 636, RDP = 3389, WinRM-HTTP = 5985, WinRM-HTTPS = 5986'
             }
         }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
-        }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Connectivity Tester" }
-
         New-UDHeading -Size 6 -Content { "Test TCP connection to a remote Host. On the remote Host, must be an Listener on the given TCP port otherwise the test fails." }
 
         New-UDLayout -Columns 1 -Content {
@@ -661,21 +766,14 @@ $Pages += New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content {
                     $Error.Clear()
                 }
                 New-UDInputAction -Content @(
-
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title "Details" -Endpoint {
                         $TestReturn | Out-UDGridData
                     }
-
                 )
-
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -683,6 +781,9 @@ $Pages += New-UDPage -Name "Connectivity Tester" -Title "$($UDTitle)" -Content {
 $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
@@ -690,14 +791,10 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
                 New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
             }
         }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
-        }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Access Tester" }
-
         New-UDHeading -Size 6 -Content { "Test WinRM access to a remote host. You need a user account who is member of the local Administrators of the remote Host." }
 
         New-UDLayout -Columns 1 -Content {
@@ -748,21 +845,14 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
                     $Error.Clear()
                 }
                 New-UDInputAction -Content @(
-
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title "Details" -Endpoint {
                         $TestReturn | Out-UDGridData
                     }
-
                 )
-
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -770,6 +860,9 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
 $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
@@ -777,14 +870,10 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
                 New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
             }
         }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
-        }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Updates Tester" }
-
         New-UDHeading -Size 6 -Content { "List configured WSUS Server, the last 5 installed Windows Update, missing Updates, and last 5 days of WindowsUpdateClient Enventlog from a remote Host." }
 
         New-UDLayout -Columns 1 -Content {
@@ -837,7 +926,6 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
                 New-UDInputAction -Content @(
 
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title "Windows Server Update Service" -Endpoint {
                         $WSUServerConfiguration | Select-Object URI,ServerName,TcpPort,Status | Out-UDGridData
                     } -NoFilter
@@ -855,13 +943,9 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
                     }
 
                 )
-
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -869,6 +953,9 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
 $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
@@ -876,14 +963,10 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
                 New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, enter an Eventlog (e.g. Application, System, Security), choose a Level (e.g. Information, Warning, Error), choose MaxEvents and press Submit'
             }
         }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
-        }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Eventlog Tester" }
-
         New-UDHeading -Size 6 -Content { "List Windows Eventlog from a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
@@ -940,21 +1023,14 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
                     $Error.Clear()
                 }
                 New-UDInputAction -Content @(
-
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title $Eventlog -Endpoint {
                         $TestReturn | Select-Object TimeCreated,Id,LevelDisplayName,Message,ProviderName | Out-UDGridData
                     }
-
                 )
-
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -962,6 +1038,9 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
 $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
@@ -969,14 +1048,10 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
                 New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, enter a Registry path (e.g. HKLM:\Software\Microsoft), and press Submit'
             }
         }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
-        }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Registry Tester" }
-
         New-UDHeading -Size 6 -Content { "List Windows Registry properties from a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
@@ -1028,7 +1103,6 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
                 New-UDInputAction -Content @(
 
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title "Items" -Endpoint {
                         $RegistryItem | Select-Object Name,Property,Value | Out-UDGridData
                     }
@@ -1038,13 +1112,9 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
                     }
 
                 )
-
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -1052,6 +1122,9 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
 $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
@@ -1059,14 +1132,10 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
                 New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, enter a path of a file to read from, and press Submit'
             }
         }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
-        }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows File Reader" }
-
         New-UDHeading -Size 6 -Content { "Read the content of a file from a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
@@ -1118,7 +1187,6 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
                 New-UDInputAction -Content @(
 
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title "File properties" -Endpoint {
                         $FileProperties | Select-Object Name,FullName,LastWriteTime | Out-UDGridData
                     }
@@ -1134,13 +1202,9 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
                     #}
 
                 )
-
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -1148,6 +1212,9 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
 $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
@@ -1155,14 +1222,10 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
                 New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, choose a Service state (Running, Stopped),  and press Submit'
             }
         }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
-        }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Service Tester" }
-
         New-UDHeading -Size 6 -Content { "List Windows Services from a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
@@ -1212,21 +1275,14 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
                 }
 
                 New-UDInputAction -Content @(
-
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title "Windows Services" -Endpoint {
                         $TestResult | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName | Out-UDGridData
                     }
-
                 )
-
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -1234,6 +1290,9 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
 $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
@@ -1241,14 +1300,10 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
                 New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
             }
         }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
-        }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Process Tester" }
-
         New-UDHeading -Size 6 -Content { "List Windows Processes from a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
@@ -1293,21 +1348,14 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
                     $Error.Clear()
                 }
                 New-UDInputAction -Content @(
-
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title "Windows Processes" -Endpoint {
                         $TestResult | Select-Object ProcessId,Name,WorkingSetSize,VirtualSize,Path,CommandLine | Out-UDGridData
                     }
-
                 )
-
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -1315,6 +1363,9 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
 $Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
@@ -1322,14 +1373,10 @@ $Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Conten
                 New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
             }
         }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
-        }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Windows Feature Tester" }
-
         New-UDHeading -Size 6 -Content { "List installed Windows Feature from a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
@@ -1373,20 +1420,14 @@ $Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Conten
                     $Error.Clear()
                 }
                 New-UDInputAction -Content @(
-
                     New-UDCard -Text "Filter: $($CardOutput)"
                     New-UDGrid -Title "Windows Features" -Endpoint {
                         $TestResult | Select-Object DisplayName,Name,Installstate | Out-UDGridData
                     }
-
                 )
-
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -1394,24 +1435,22 @@ $Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Conten
 $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
                 New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
+                New-UDHtml "The vRO-Trigger 'HKLM:\Software\Swisscom\SCCM' -Property 'LastPatchRun' should be deleted after patching and the SCCM-Trigger 'HKLM:\Software\Swisscom\WindowsUpdate' -Property 'LastPatchRun' must exists after patching."
             }
-        }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
         }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "SCCM Patching Tester" }
-
         New-UDHeading -Size 6 -Content { "List SCCM Patching properties from a remote Host" }
-
-        New-UDHtml "The vRO-Trigger 'HKLM:\Software\Swisscom\SCCM' -Property 'LastPatchRun' should be deleted after patching and the SCCM-Trigger 'HKLM:\Software\Swisscom\WindowsUpdate' -Property 'LastPatchRun' must exists after patching."
 
         New-UDLayout -Columns 1 -Content {
             
@@ -1486,7 +1525,6 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                 New-UDInputAction -Content @(
 
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title "vRO Workflow" -Endpoint {
                         $vRO | Select-Object Name,Property,Value | Out-UDGridData
                     } -NoFilter -NoExport -BackgroundColor $vRObgcolor
@@ -1511,18 +1549,95 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                         $MissingWindowsUpdates | Select-Object DateTime,Message | Out-UDGridData
                     } -DefaultSortColumn DateTime -DefaultSortDescending $true
 
-                    New-UDGrid -Title "Windows Update Enventlog" -Endpoint {
-                        $WindowsUpdateClientLog | Select-Object TimeCreated,Id,LevelDisplayName,Message,MachineName,LogName | Out-UDGridData
+                    New-UDGrid -Title "Windows Update Client Enventlog" -Endpoint {
+                        $WindowsUpdateClientLog | Select-Object TimeCreated,Id,LevelDisplayName,Message | Out-UDGridData
                     }
 
                 )
-
             }
-
         }
-
     }
+}
+#endregion
 
+#region "SCCM Agent Tester"
+$Pages += New-UDPage -Name "SCCM Agent Tester" -Title "$($UDTitle)" -Content { 
+
+    New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
+        New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
+            Show-UDModal -Header {
+                New-UDHeading -Size 6 -Text "Remote Information"
+            } -BottomSheet -Content {
+                New-UDHtml 'Enter the Username and Password for the remote host-login, enter the Fully Qualified Name or IP Address of the remote host, and press Submit'
+            }
+        }
+    }
+    New-UDLayout -Columns 1 -Content {
+
+        New-UDHeading -Size 4 -Content { "SCCM Agent Tester" }
+        New-UDHeading -Size 6 -Content { "List SCCM Agent properties from a remote Host" }
+
+        New-UDLayout -Columns 1 -Content {
+            
+            New-UDInput -Title "Remote Information" -Content {
+                New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
+                New-UDInputField -Type password -Name Password     -Placeholder 'Password'
+                New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
+            } -Validate -Endpoint {
+                param(
+                    [Parameter(Mandatory)]
+                    $Username, 
+
+                    [Parameter(Mandatory)]
+                    $Password, 
+
+                    [Parameter(Mandatory)]
+                    $Remotehost
+                )
+                Show-UDToast -Message "Send Tests to $Remotehost"
+                try{
+                    $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
+                    if($TestReturn.TcpSucceeded){
+                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
+                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        if($rsession.State -eq 'Opened'){
+                            $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
+                            $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
+                            Show-UDToast -Message "Search for installed SCCM Agent Software"
+                            $SccmAgent      = Get-SccmAgent -RemoteSession $rsession -SoftwareName "Configuration Manager Client"
+                            Show-UDToast -Message "Collect SCCM Service properties"
+                            $SccmService    = Get-SccmService -RemoteSession $rsession -ServiceName "CcmExec"
+                        }else{
+                            $CardOutput = "Session to $Remotehost is $($rsession.State)"
+                        }
+                        Remove-PSSession -Session $rsession
+                    }else{
+                        $CardOutput = "Test-PsNetTping -Destination $Remotehost -TcpPort 5985"
+                    }
+                }
+                catch{
+                    $CardOutput = "$($Remotehost): $($_.Exception.Message)"
+                    $Error.Clear()
+                }
+                New-UDInputAction -Content @(
+
+                    New-UDCard -Text "Filter: $($CardOutput)"
+                    New-UDGrid -Title "SCCM Agent" -Endpoint {
+                        $SccmAgent | Select-Object Name,Version,Publisher,InstallDate | Out-UDGridData
+                    } -NoFilter
+                    New-UDGrid -Title "SCCM Service" -Endpoint {
+                        #$SccmService | Select-Object Name,Status,StartType | Out-UDGridData
+                        $SccmService | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName | Out-UDGridData
+                    } -NoFilter
+
+                )
+            }
+        }
+    }
 }
 #endregion
 
@@ -1530,6 +1645,9 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
 $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content { 
 
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
+        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
+            Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+        }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
@@ -1537,14 +1655,10 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                 New-UDHtml 'Enter the Username and Password for the Tenant-login, choose an Environment (e.g. DEV, INT, CAT, or PRD), enter a Tenant name (e.g. fornax-005), choose an OS (e.g. All, Windows, Linux), and press Submit'
             }
         }
-        New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
-            Show-UDToast "Ha, this is only a fake-function!" -Duration 5000
-        }
     }
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "vRAResource Tester" }
-
         New-UDHeading -Size 6 -Content { "List all Windows Virtual Machines for a Tenant (e.g. fornax-005)." }
 
         New-UDLayout -Columns 1 -Content {
@@ -1572,7 +1686,6 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     [Parameter(Mandatory)]
                     $OS
                 )
-
                 try{
                     $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
                     #$mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
@@ -1587,49 +1700,16 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     $connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $Username -Password $secpasswd -SslProtocol Tls12 -IgnoreCertRequirements
                     if($connection){
                         switch($OS){
-                            'All'     {$vRAResource = Get-vRAResource -Type Machine}
-                            'Windows' {$vRAResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Windows'}}
-                            'Linux'   {$vRAResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Linux'}}
+                            'All'     {$vRAMachineResource = Get-vRAResource -Type Machine}
+                            'Windows' {$vRAMachineResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Windows'}}
+                            'Linux'   {$vRAMachineResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Linux'}}
                         }
                         Show-UDToast -Message "Collect data from resources"
-                        if($vRAResource){
-                            $TestResult = foreach($_ in $vRAResource) { 
-                                if($_.Data.MachineName){
-                                    [PSCustomObject]@{
-                                        VMName           = $_.Data.MachineName
-                                        Status           = $_.Status
-                                        Owners           = $_.Owners
-                                        Email            = $_.Data.'Scc.Ms.technicalContactEmail'
-                                        TenantId         = $_.TenantId
-                                        DateCreated      = (Get-Date ($_.DateCreated))
-                                        LastUpdated      = (Get-Date ($_.LastUpdated))
-                                        BlueprintName    = $_.Data.MachineBlueprintName
-                                        OS               = $_.Data.MachineGuestOperatingSystem
-                                        Memory           = $_.Data.MachineMemory
-                                        CPU              = $_.Data.MachineCPU
-                                        TotalStorage     = $_.Data.MachineStorage
-                                        ExposeToSpdn     = $_.Data.'Scc.Vm.Orch.ExposeToSpdn'
-                                        ResourceDomain   = $_.Data.'Scc.Ms.ResourceDomain'
-                                        PrimaryIPaddress = $_.data.__datacollected_ipaddress
-                                        IPv4Address      = $_.data.NETWORK_LIST.data.NETWORK_ADDRESS
-                                        MACAddress       = $_.data.NETWORK_LIST.data.NETWORK_MAC_ADDRESS
-                                        SPDNTranslatedIp = $_.Data.'Scc.Vm.Orch.spdnTranslatedIp'
-                                        PatchingWindow   = $_.Data.'Scc.Ms.PatchingWindow'
-                                        ManagedState     = $_.Data.'Scc.Ms.State'
-                                        IsManaged        = $_.Data.'Scc.Ms.isManaged'
-                                        VMTemplate       = $_.Data.'Scc.Ms.Template'
-                                        UUID             = $_.Data.'Scc.Vm.Orch.UUID'
-                                        ComputerName     = $_.Data.'SysPrep.UserData.ComputerName'
-                                        'DNS-A-Record'   = "$($_.Data.'Scc.Vm.Orch.UUID').sccloudres.net"
-                                        LastPatched      = $_.Data.'Scc.Ms.LastPatched'
-                                        PatchingSuspend  = $_.Data.'Scc.Ms.suspendedPatching'
-                                        StorageCluster   = $_.Data.'VirtualMachine.Storage.Cluster.Name'
-                                    }
-                                }
-                            }
+                        if($vRAMachineResource){
+                            $TestResult = Get-vRaResourceData -Resource $vRAMachineResource
                         }
                         else{
-                            $CardOutput = "No resources found in $($vRAServer), Tenant $($Tenant) as User $($Username)."
+                            $CardOutput = "No resources found in $($vRAServer) for Tenant $($Tenant) as User $($Username)."
                         }
                     }
                     else{
@@ -1642,20 +1722,14 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     $Error.Clear()
                 }
                 New-UDInputAction -Content @(
-
                     New-UDCard -Text "Filter: $($CardOutput)"
-
                     New-UDGrid -Title "Found $($TestResult.count) Virtual Machines" -Endpoint {
                         $TestResult | Select-Object Status,VMName,ComputerName,DateCreated,Owners,OS,BlueprintName,ManagedState,LastPatched,IPv4Address,SPDNTranslatedIp,ExposeToSpdn,Email | Out-UDGridData
                     } -DefaultSortColumn DateCreated -DefaultSortDescending $true
                 )
-
             }
-
         }
-
     }
-
 }
 #endregion
 
@@ -1683,12 +1757,13 @@ $Navigation = New-UDSideNav -Content {
         New-UDSideNavItem -Text "Windows Processes"      -PageName "Windows Process Tester"   -Icon windows
         New-UDSideNavItem -Text "Windows Features"       -PageName "Windows Feature Tester"   -Icon windows
         New-UDSideNavItem -Text "Windows File Reader"    -PageName "Windows File Reader"      -Icon windows
+        New-UDSideNavItem -Text "SCCM Agent Tester"      -PageName "SCCM Agent Tester"        -Icon windows
         New-UDSideNavItem -Text "SCCM Patching Tester"   -PageName "SCCM Patching Tester"     -Icon windows
     } -Icon server
 
     if(Get-Module PowerVRA -ListAvailable){
         New-UDSideNavItem -Text "vRealize Automation" -Children {
-            New-UDSideNavItem -Text "Ask for vRAResources" -PageName "vRAResource Tester"   -Icon rocket
+            New-UDSideNavItem -Text "Ask for vRAResources" -PageName "vRAResource Tester" -Icon rocket
         } -Icon cloud
     }
 
