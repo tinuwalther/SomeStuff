@@ -93,14 +93,6 @@ function Get-SccmService{
     $ScriptBlockContent = {
         Param($ServiceName)
         Get-CimInstance win32_service | Where-Object Name -match $ServiceName | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName
-        <#
-        $CcmExec = Get-Service -Name $ServiceName
-        [PSCustomObject]@{
-            Name      = $CcmExec.DisplayName
-            Status    = $CcmExec.Status
-            StartType = $CcmExec.StartType
-        }
-        #>
     }
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $ServiceName
 }
@@ -292,7 +284,7 @@ function Get-SCSWindowsFeature{
         $RemoteSession
     )
     $ScriptBlockContent = {
-        Get-WindowsFeature | Where-Object {$_.Installed -match $True} | Select-Object DisplayName,Name,Installstate
+        Get-WindowsFeature | Where-Object {$_.Installed -match $True} | Select-Object DisplayName,Name,DependsOn
     }
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent
 }
@@ -385,14 +377,14 @@ function Get-SCSWindowsEventLog{
         if($Level -eq 'All'){
             Get-WinEvent -MaxEvents $MaxEvents -FilterHashtable @{
                 Logname   = $EventlogName
-                StartTime = (get-date).AddDays(-5)
-                EndTime   = get-date
+                #StartTime = (get-date).AddDays(-5)
+                #EndTime   = get-date
             } -ErrorAction SilentlyContinue | Select-Object TimeCreated,LogName,ProviderName,Id,LevelDisplayName,Message,MachineName
         }else{
             Get-WinEvent -MaxEvents $MaxEvents -FilterHashtable @{
                 Logname   = $EventlogName
-                StartTime = (get-date).AddDays(-5)
-                EndTime   = get-date
+                #StartTime = (get-date).AddDays(-5)
+                #EndTime   = get-date
             } -ErrorAction SilentlyContinue | Where-Object LevelDisplayName -eq $Level | Select-Object TimeCreated,LogName,ProviderName,Id,LevelDisplayName,Message,MachineName
         }
     }
@@ -507,7 +499,7 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-$UDTitle = "Remote Operating - v0.0.10-beta"
+$UDTitle = "Remote Operating - v0.0.13-beta"
 $Pages   = @()
 #endregion
 
@@ -559,7 +551,7 @@ $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
             ) #-Size small
 
             New-UDCard -Title 'Windows Eventlog' -Content {
-                New-UDParagraph -Text 'List Eventlog entries from the last 5 days from a remote host.'
+                New-UDParagraph -Text 'List Eventlog entries from a remote host.'
             } -Links @(
                 New-UDLink -Text 'Windows Eventlog' -Url 'Windows-Eventlog-Tester'
             ) #-Size small
@@ -1422,7 +1414,7 @@ $Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Conten
                 New-UDInputAction -Content @(
                     New-UDCard -Text "Filter: $($CardOutput)"
                     New-UDGrid -Title "Windows Features" -Endpoint {
-                        $TestResult | Select-Object DisplayName,Name,Installstate | Out-UDGridData
+                        $TestResult | Select-Object DisplayName,Name,DependsOn | Out-UDGridData
                     }
                 )
             }
@@ -1496,6 +1488,19 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                             }
 
                             $WSUServerConfiguration  = Get-WsusServer -RemoteSession $rsession
+                            if($WSUServerConfiguration.Status -match 'OK'){
+                                $Wsusbgcolor = 'lightgreen'
+                            }else{
+                                $Wsusbgcolor = 'indianred'
+                            }
+
+                            Show-UDToast -Message "Collect BITS Service properties"
+                            $BitsService  = Get-SccmService -RemoteSession $rsession -ServiceName "BITS"
+                            if($BitsService.StartMode -match 'disabled'){
+                                $Bitsbgcolor = 'indianred'
+                            }else{
+                                $Bitsbgcolor = 'lightgreen'
+                            }
 
                             Show-UDToast -Message "Collect installed Windows Updates"
                             $InstalledWindowsUpdates = Get-InstalledUpdates -RemoteSession $rsession
@@ -1507,8 +1512,8 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                                 FullName      = $wulog.FullName
                             }
                             $MissingWindowsUpdates   = Get-SccmWUAHandlerLog -RemoteSession $rsession
-                            Show-UDToast -Message "Collect data from Windows Update Clientlog"
-                            $WindowsUpdateClientLog  = Get-WindowsUpdateClientLog -RemoteSession $rsession
+                            #Show-UDToast -Message "Collect data from Windows Update Clientlog"
+                            #$WindowsUpdateClientLog  = Get-WindowsUpdateClientLog -RemoteSession $rsession
 
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
@@ -1528,14 +1533,16 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                     New-UDGrid -Title "vRO Workflow" -Endpoint {
                         $vRO | Select-Object Name,Property,Value | Out-UDGridData
                     } -NoFilter -NoExport -BackgroundColor $vRObgcolor
-
                     New-UDGrid -Title "SCCM Workflow" -Endpoint {
                         $SCCM | Select-Object Name,Property,Value | Out-UDGridData
                     } -NoFilter -NoExport -BackgroundColor $SCCMbgcolor
 
                     New-UDGrid -Title "Windows Server Update Service" -Endpoint {
                         $WSUServerConfiguration | Select-Object URI,ServerName,TcpPort,Status | Out-UDGridData
-                    } -NoFilter
+                    } -NoFilter -NoExport -BackgroundColor $Wsusbgcolor
+                    New-UDGrid -Title "BITS Service" -Endpoint {
+                        $BitsService | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName | Out-UDGridData
+                    } -NoFilter -NoExport -BackgroundColor $Bitsbgcolor
 
                     New-UDGrid -Title "Installed Windows Update" -Endpoint {
                         $InstalledWindowsUpdates | Select-Object InstalledOn,HotFixID,Description | Out-UDGridData
@@ -1548,11 +1555,11 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                     New-UDGrid -Title "Content from Windows Update Handlerlog" -Endpoint {
                         $MissingWindowsUpdates | Select-Object DateTime,Message | Out-UDGridData
                     } -DefaultSortColumn DateTime -DefaultSortDescending $true
-
+                    <#      
                     New-UDGrid -Title "Windows Update Client Enventlog" -Endpoint {
                         $WindowsUpdateClientLog | Select-Object TimeCreated,Id,LevelDisplayName,Message | Out-UDGridData
                     }
-
+                    #>
                 )
             }
         }
@@ -1652,7 +1659,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
             Show-UDModal -Header {
                 New-UDHeading -Size 6 -Text "Remote Information"
             } -BottomSheet -Content {
-                New-UDHtml 'Enter the Username and Password for the Tenant-login, choose an Environment (e.g. DEV, INT, CAT, or PRD), enter a Tenant name (e.g. fornax-005), choose an OS (e.g. All, Windows, Linux), and press Submit'
+                New-UDHtml 'Enter the Username and Password for the Tenant-login, choose an Environment (e.g. DEV, INT, CAT, or PRD), enter a Tenant name (e.g. fornax-005), enter a VMName or leave All, choose an OS (e.g. All, Windows, Linux), and press Submit'
             }
         }
     }
@@ -1668,6 +1675,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type select   -Name Environment  -Values @( 'PRD','CAT','INT','DEV')
                 New-UDInputField -Type textbox  -Name Tenant       -Placeholder 'Tenant'
+                New-UDInputField -Type textbox  -Name VMName       -Placeholder 'VMName' -DefaultValue 'All'
                 New-UDInputField -Type select   -Name OS           -Values @('All','Windows','Linux')
             } -Endpoint {
                 param(
@@ -1684,6 +1692,9 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     $Tenant,
 
                     [Parameter(Mandatory)]
+                    $VMName,
+
+                    [Parameter(Mandatory)]
                     $OS
                 )
                 try{
@@ -1695,14 +1706,19 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                         'CAT' {$vRAServer = 'cmp.cat.entcloud.swisscom.com'}
                         'PRD' {$vRAServer = 'cmp.entcloud.swisscom.com'}
                     }
-                    $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), -> OS $($OS), -> Username $($Username)"
                     Show-UDToast -Message "Connect-vRAServer -Server $($vRAServer) -Tenant $($Tenant) -Username $($Username)"
                     $connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $Username -Password $secpasswd -SslProtocol Tls12 -IgnoreCertRequirements
                     if($connection){
-                        switch($OS){
-                            'All'     {$vRAMachineResource = Get-vRAResource -Type Machine}
-                            'Windows' {$vRAMachineResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Windows'}}
-                            'Linux'   {$vRAMachineResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Linux'}}
+                        if($VMName -eq 'All'){
+                            $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), -> OS $($OS), -> Username $($Username)"
+                            switch($OS){
+                                'All'     {$vRAMachineResource = Get-vRAResource -Type Machine}
+                                'Windows' {$vRAMachineResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Windows'}}
+                                'Linux'   {$vRAMachineResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Linux'}}
+                            }
+                        }else{
+                            $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), VMName -> $($VMName) -> OS $($OS), -> Username $($Username)"
+                            $vRAMachineResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineName -match $VMName}
                         }
                         Show-UDToast -Message "Collect data from resources"
                         if($vRAMachineResource){
