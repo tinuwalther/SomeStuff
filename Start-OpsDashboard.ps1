@@ -41,7 +41,11 @@ if(Get-Module psPAS -ListAvailable){
 #region functions
 
 function Send-RemoteOperatingMail{
-    $Sender      = 'user01@swisscom.com'
+    [CmdletBinding()]
+    param(
+        $MailMessage
+    )
+    #$Sender      = 'user01@swisscom.com' -> kann nicht dynamisch ausgelesen werden
     $Receipient  = 'martin.walther@swisscom.com'
     switch($Computername){
         'admin' {$SmtpServer  = "psrvcm02mxr0001.sccloudinfra.net"} #Service Tier 2
@@ -284,7 +288,24 @@ function Get-SCSWindowsFeature{
         $RemoteSession
     )
     $ScriptBlockContent = {
-        Get-WindowsFeature | Where-Object {$_.Installed -match $True} | Select-Object DisplayName,Name,DependsOn
+        $WindowsFeature = Get-WindowsFeature | Where-Object {$_.Installed -match $True} | Select-Object DisplayName,Name,DependsOn 
+        foreach($feature in $WindowsFeature){
+            
+            $DependsOn = $null
+            foreach($item in $feature.DependsOn){
+                $DependsOn = "$($item), $($DependsOn)"
+            }
+            if(!([String]::IsNullOrEmpty($DependsOn))){
+                $DependsOn = $DependsOn.TrimEnd(', ')
+            }
+
+            [PSCustomObject]@{
+                DisplayName = $feature.DisplayName
+                Name        = $feature.Name
+                DependsOn   = $DependsOn
+            }
+
+        }
     }
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent
 }
@@ -456,29 +477,29 @@ function Get-vRaResourceData{
                 Status           = $_.Status
                 Owners           = $_.Owners
                 Email            = $_.Data.'Scc.Ms.technicalContactEmail'
-                TenantId         = $_.TenantId
+                #TenantId         = $_.TenantId
                 DateCreated      = (Get-Date ($_.DateCreated))
-                LastUpdated      = (Get-Date ($_.LastUpdated))
+                #LastUpdated      = (Get-Date ($_.LastUpdated))
                 BlueprintName    = $_.Data.MachineBlueprintName
                 OS               = $_.Data.MachineGuestOperatingSystem
-                Memory           = $_.Data.MachineMemory
-                CPU              = $_.Data.MachineCPU
-                TotalStorage     = $_.Data.MachineStorage
+                #Memory           = $_.Data.MachineMemory
+                #CPU              = $_.Data.MachineCPU
+                #TotalStorage     = $_.Data.MachineStorage
                 ExposeToSpdn     = $_.Data.'Scc.Vm.Orch.ExposeToSpdn'
-                ResourceDomain   = $_.Data.'Scc.Ms.ResourceDomain'
-                PrimaryIPaddress = $_.data.__datacollected_ipaddress
+                #ResourceDomain   = $_.Data.'Scc.Ms.ResourceDomain'
+                #PrimaryIPaddress = $_.data.__datacollected_ipaddress
                 IPv4Address      = $_.data.NETWORK_LIST.data.NETWORK_ADDRESS
-                MACAddress       = $_.data.NETWORK_LIST.data.NETWORK_MAC_ADDRESS
+                #MACAddress       = $_.data.NETWORK_LIST.data.NETWORK_MAC_ADDRESS
                 SPDNTranslatedIp = $_.Data.'Scc.Vm.Orch.spdnTranslatedIp'
-                PatchingWindow   = $_.Data.'Scc.Ms.PatchingWindow'
+                #PatchingWindow   = $_.Data.'Scc.Ms.PatchingWindow'
                 ManagedState     = $_.Data.'Scc.Ms.State'
-                IsManaged        = $_.Data.'Scc.Ms.isManaged'
-                VMTemplate       = $_.Data.'Scc.Ms.Template'
-                UUID             = $_.Data.'Scc.Vm.Orch.UUID'
+                #IsManaged        = $_.Data.'Scc.Ms.isManaged'
+                #VMTemplate       = $_.Data.'Scc.Ms.Template'
+                #UUID             = $_.Data.'Scc.Vm.Orch.UUID'
                 ComputerName     = $_.Data.'SysPrep.UserData.ComputerName'
                 LastPatched      = $_.Data.'Scc.Ms.LastPatched'
-                PatchingSuspend  = $_.Data.'Scc.Ms.suspendedPatching'
-                StorageCluster   = $_.Data.'VirtualMachine.Storage.Cluster.Name'
+                #PatchingSuspend  = $_.Data.'Scc.Ms.suspendedPatching'
+                #StorageCluster   = $_.Data.'VirtualMachine.Storage.Cluster.Name'
             }
         }
     }
@@ -499,7 +520,7 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-$UDTitle = "Remote Operating - v0.0.13-beta"
+$UDTitle = "Remote Operating - v0.0.16-beta"
 $Pages   = @()
 #endregion
 
@@ -511,6 +532,7 @@ $Pages += New-UDPage -Name "Home" -Title "$($UDTitle)" -Content {
     New-UdFab -Icon "plus" -Size "large" -ButtonColor "lightgreen" -IconColor 'white' -Content {
         New-UDFabButton -Icon "comment" -Size "large" -ButtonColor "lightblue" -IconColor 'white' -onClick {
             Show-UDToast "$($UDTitle): Ha, this is only a fake-function!" -Duration 5000
+            #Send-RemoteOperatingMail -MailMessage "Page: Home -> Help needed."
         }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
@@ -1667,11 +1689,21 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
 
         New-UDHeading -Size 4 -Content { "vRAResource Tester" }
         New-UDHeading -Size 6 -Content { "List all Windows Virtual Machines for a Tenant (e.g. fornax-005)." }
+        
+        Import-Module -Name CredentailManager
+        $defaultuser     = $env:USERNAME
+        if(Get-Module CredentialManager -ErrorAction SilentlyContinue){
+        $Credentials = Get-StoredCredential -Target 'RemoteOps'
+            if(![String]::IsNullOrEmpty($Credentials)){
+                New-UDCard -Title "Cached credentials" -Text "You can execute this function with cached login data for $($Credentials.Username) without entering user name and password."
+                $defaultuser     = $Credentials.Username
+            }
+        }
 
         New-UDLayout -Columns 1 -Content {
 
             New-UDInput -Title "vRA Information" -Content {
-                New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
+                New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username' -DefaultValue $defaultuser
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type select   -Name Environment  -Values @( 'PRD','CAT','INT','DEV')
                 New-UDInputField -Type textbox  -Name Tenant       -Placeholder 'Tenant'
@@ -1698,8 +1730,13 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     $OS
                 )
                 try{
-                    $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                    #$mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                    if(Get-Module CredentialManager -ErrorAction SilentlyContinue){
+                        $Credentials = Get-StoredCredential -Target 'RemoteOps'
+                        if([String]::IsNullOrEmpty($Credentials)){
+                            $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                            $Credentials = New-StoredCredential -Target 'RemoteOps' -UserName $Username -Password $secpasswd
+                        }
+                    }
                     switch($Environment){
                         'DEV' {$vRAServer = 'cmp.dev-02.entcloud.swisscom.com'}
                         'INT' {$vRAServer = 'cmp.int-02.entcloud.swisscom.com'}
@@ -1707,7 +1744,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                         'PRD' {$vRAServer = 'cmp.entcloud.swisscom.com'}
                     }
                     Show-UDToast -Message "Connect-vRAServer -Server $($vRAServer) -Tenant $($Tenant) -Username $($Username)"
-                    $connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $Username -Password $secpasswd -SslProtocol Tls12 -IgnoreCertRequirements
+                    $connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $Credentials.Username -Password $Credentials.Password -SslProtocol Tls12 -IgnoreCertRequirements
                     if($connection){
                         if($VMName -eq 'All'){
                             $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), -> OS $($OS), -> Username $($Username)"
@@ -1718,7 +1755,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                             }
                         }else{
                             $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), VMName -> $($VMName) -> OS $($OS), -> Username $($Username)"
-                            $vRAMachineResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineName -match $VMName}
+                            $vRAMachineResource = Get-vRAResource -Name $VMName
                         }
                         Show-UDToast -Message "Collect data from resources"
                         if($vRAMachineResource){
