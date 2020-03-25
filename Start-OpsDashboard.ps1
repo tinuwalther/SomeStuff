@@ -109,71 +109,72 @@ function Get-SccmWUAHandlerLog{
     
     $ScriptBlockContent = {
 
-        $FoundUpdate     = 'Update \(Missing\)\:\D+'
-        $InstallStated   = 'Async installation of updates started\D+'
-        $InstallFinished = 'Installation of updates completed\D+'
+        if(Test-Path -Path "C:\Windows\CCM\Logs\WUAHandler.log"){
+            $FoundUpdate     = 'Update \(Missing\)\:\D+'
+            $InstallStated   = 'Async installation of updates started\D+'
+            $InstallFinished = 'Installation of updates completed\D+'
         
-        $UpdateRegex     = '(?<=^\<\!\[LOG\[\d\.\sUpdate \(Missing\)\:\s)(.*)(?=\]LOG\]\!\>)'
-        $LogRegex        = '(?<=^\<\!\[LOG\[)(.*)(?=\]LOG\]\!\>)'
-        $TimeRegex       = '(?<=\<time=")(.*)(?=" date)'
-        $DateRegex       = '(?<=date=")(.*)(?=" component)'
+            $UpdateRegex     = '(?<=^\<\!\[LOG\[\d\.\sUpdate \(Missing\)\:\s)(.*)(?=\]LOG\]\!\>)'
+            $LogRegex        = '(?<=^\<\!\[LOG\[)(.*)(?=\]LOG\]\!\>)'
+            $TimeRegex       = '(?<=\<time=")(.*)(?=" date)'
+            $DateRegex       = '(?<=date=")(.*)(?=" component)'
 
-        $wulog = Get-Content -Path "C:\Windows\CCM\Logs\WUAHandler.log"
+            $wulog = Get-Content -Path "C:\Windows\CCM\Logs\WUAHandler.log"
         
-        $wulog | Where-Object {$_ -match $FoundUpdate} | ForEach-Object {
-            $_ -match $UpdateRegex | Out-Null
-            $Log = $Matches[0]
+            $wulog | Where-Object {$_ -match $FoundUpdate} | ForEach-Object {
+                $_ -match $UpdateRegex | Out-Null
+                $Log = $Matches[0]
 
-            $_ -match $DateRegex | Out-Null
-            $Date = $Matches[0]
+                $_ -match $DateRegex | Out-Null
+                $Date = $Matches[0]
     
-            $_ -match $TimeRegex | Out-Null
-            $Time = $Matches[0]
+                $_ -match $TimeRegex | Out-Null
+                $Time = $Matches[0]
 
-            $DateTime = "$($Date) $($Time)"
+                $DateTime = "$($Date) $($Time)"
     
-            [PSCustomObject]@{
-                Message  = $Log
-                DateTime = $DateTime
+                [PSCustomObject]@{
+                    Message  = $Log
+                    DateTime = $DateTime
+                }
+            }
+
+            $wulog | Where-Object {$_ -match $InstallStated} | ForEach-Object {
+                $_ -match $LogRegex | Out-Null
+                $Log = $Matches[0]
+
+                $_ -match $DateRegex | Out-Null
+                $Date = $Matches[0]
+    
+                $_ -match $TimeRegex | Out-Null
+                $Time = $Matches[0]
+    
+                $DateTime = "$($Date) $($Time)"
+
+                [PSCustomObject]@{
+                    Message  = $Log
+                    DateTime = $DateTime
+                }
+            }
+
+            $wulog | Where-Object {$_ -match $InstallFinished} | ForEach-Object {
+                $_ -match $LogRegex | Out-Null
+                $Log = $Matches[0]
+
+                $_ -match $DateRegex | Out-Null
+                $Date = $Matches[0]
+    
+                $_ -match $TimeRegex | Out-Null
+                $Time = $Matches[0]
+    
+                $DateTime = "$($Date) $($Time)"
+
+                [PSCustomObject]@{
+                    Message  = $Log
+                    DateTime = $DateTime
+                }
             }
         }
-
-        $wulog | Where-Object {$_ -match $InstallStated} | ForEach-Object {
-            $_ -match $LogRegex | Out-Null
-            $Log = $Matches[0]
-
-            $_ -match $DateRegex | Out-Null
-            $Date = $Matches[0]
-    
-            $_ -match $TimeRegex | Out-Null
-            $Time = $Matches[0]
-    
-            $DateTime = "$($Date) $($Time)"
-
-            [PSCustomObject]@{
-                Message  = $Log
-                DateTime = $DateTime
-            }
-        }
-
-        $wulog | Where-Object {$_ -match $InstallFinished} | ForEach-Object {
-            $_ -match $LogRegex | Out-Null
-            $Log = $Matches[0]
-
-            $_ -match $DateRegex | Out-Null
-            $Date = $Matches[0]
-    
-            $_ -match $TimeRegex | Out-Null
-            $Time = $Matches[0]
-    
-            $DateTime = "$($Date) $($Time)"
-
-            [PSCustomObject]@{
-                Message  = $Log
-                DateTime = $DateTime
-            }
-        }
-
     }
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent
 }
@@ -277,7 +278,9 @@ function Get-FileProperties{
 
     $ScriptBlockContent = {
         Param($File)
-        Get-Item -Path $File
+        if(Test-Path -Path $File){
+            Get-Item -Path $File
+        }
     }
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $File
 }
@@ -320,16 +323,18 @@ function Get-FileContent{
     $ScriptBlockContent = {
         Param($File)
         #Get-Content -Path $File -ReadCount 5000
-        $i = 0
-        [System.IO.File]::ReadLines($File) | ForEach-Object {
+        if(Test-Path -Path $File){
+            $i = 0
+            [System.IO.File]::ReadLines($File) | ForEach-Object {
             
-            if(!([String]::IsNullOrEmpty($_))){
-                [PSCustomObject]@{
-                    Line = $i
-                    Text = $_
+                if(!([String]::IsNullOrEmpty($_))){
+                    [PSCustomObject]@{
+                        Line = $i
+                        Text = $_
+                    }
                 }
+                $i ++
             }
-            $i ++
         }
     }
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $File
@@ -423,15 +428,17 @@ function Get-SCSRegistryItem{
     $ScriptBlockContent = {
         Param($RegistryPath)
         $name, $value = $null
-        Get-Item -Path $RegistryPath | ForEach-Object {
-            foreach($item in $_.Property){
-                if($($_.Name) -match 'HKEY_LOCAL_MACHINE'){$name  = $_.Name -replace 'HKEY_LOCAL_MACHINE','HKLM:'}
-                if($($_.Name) -match 'HKEY_CURRENT_USER') {$name  = $_.Name -replace 'HKEY_CURRENT_USER','HKCU:'}
-                $value = Get-ItemPropertyValue -Path $RegistryPath -Name $item
-                [PSCustomObject]@{
-                    Name     = $name
-                    Property = $item
-                    Value    = $value
+        if(Test-Path -Path $RegistryPath){
+            Get-Item -Path $RegistryPath | ForEach-Object {
+                foreach($item in $_.Property){
+                    if($($_.Name) -match 'HKEY_LOCAL_MACHINE'){$name  = $_.Name -replace 'HKEY_LOCAL_MACHINE','HKLM:'}
+                    if($($_.Name) -match 'HKEY_CURRENT_USER') {$name  = $_.Name -replace 'HKEY_CURRENT_USER','HKCU:'}
+                    $value = Get-ItemPropertyValue -Path $RegistryPath -Name $item
+                    [PSCustomObject]@{
+                        Name     = $name
+                        Property = $item
+                        Value    = $value
+                    }
                 }
             }
         }
@@ -449,15 +456,17 @@ function Get-SCSRegistryChildItem{
     $ScriptBlockContent = {
         Param($RegistryPath)
         $name, $value = $null
-        Get-ChildItem -Path $RegistryPath | ForEach-Object {
-            foreach($item in $_.Property){
-                if($($_.Name) -match 'HKEY_LOCAL_MACHINE'){$name  = $_.Name -replace 'HKEY_LOCAL_MACHINE','HKLM:'}
-                if($($_.Name) -match 'HKEY_CURRENT_USER') {$name  = $_.Name -replace 'HKEY_CURRENT_USER','HKCU:'}
-                $value = Get-ItemPropertyValue -Path $name -Name $item
-                [PSCustomObject]@{
-                    Name     = $name
-                    Property = $item
-                    Value    = $value
+        if(Test-Path -Path $RegistryPath){
+            Get-ChildItem -Path $RegistryPath | ForEach-Object {
+                foreach($item in $_.Property){
+                    if($($_.Name) -match 'HKEY_LOCAL_MACHINE'){$name  = $_.Name -replace 'HKEY_LOCAL_MACHINE','HKLM:'}
+                    if($($_.Name) -match 'HKEY_CURRENT_USER') {$name  = $_.Name -replace 'HKEY_CURRENT_USER','HKCU:'}
+                    $value = Get-ItemPropertyValue -Path $name -Name $item
+                    [PSCustomObject]@{
+                        Name     = $name
+                        Property = $item
+                        Value    = $value
+                    }
                 }
             }
         }
@@ -520,7 +529,7 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-$UDTitle = "Remote Operating - v0.0.16-beta"
+$UDTitle = "Remote Operating - v0.0.18-beta"
 $Pages   = @()
 #endregion
 
@@ -1497,30 +1506,38 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                             Show-UDToast -Message "Collect data from registry"
                             $vRO  = Get-SCSRegistryItem -RemoteSession $rsession -RegistryPath 'HKLM:\Software\Swisscom\SCCM'
                             if([String]::IsNullOrEmpty($vRO.Value)){
+                                $vROText    = "Trigger: not found"
                                 $vRObgcolor = 'lightgreen'
                             }else{
+                                $vROText    = "Trigger: not deleted"
                                 $vRObgcolor = 'indianred'
                             }
 
                             $SCCM = Get-SCSRegistryItem -RemoteSession $rsession -RegistryPath 'HKLM:\Software\Swisscom\WindowsUpdate'
                             if([String]::IsNullOrEmpty($SCCM.Value)){
+                                $SccmText    = "LastPatchRun: not found"
                                 $SCCMbgcolor = 'indianred'
                             }else{
+                                $SccmText    = "LastPatchRun: $($SCCM.Value)"
                                 $SCCMbgcolor = 'lightgreen'
                             }
 
                             $WSUServerConfiguration  = Get-WsusServer -RemoteSession $rsession
                             if($WSUServerConfiguration.Status -match 'OK'){
+                                $WsusText    = "Access Status: $($WSUServerConfiguration.Status)"
                                 $Wsusbgcolor = 'lightgreen'
                             }else{
+                                $WsusText    = "Access Status: $($WSUServerConfiguration.Status)"
                                 $Wsusbgcolor = 'indianred'
                             }
 
                             Show-UDToast -Message "Collect BITS Service properties"
                             $BitsService  = Get-SccmService -RemoteSession $rsession -ServiceName "BITS"
                             if($BitsService.StartMode -match 'disabled'){
+                                $BitsText    = "Service StartMode: $($BitsService.StartMode)"
                                 $Bitsbgcolor = 'indianred'
                             }else{
+                                $BitsText    = "Service StartMode: $($BitsService.StartMode)"
                                 $Bitsbgcolor = 'lightgreen'
                             }
 
@@ -1552,6 +1569,15 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                 New-UDInputAction -Content @(
 
                     New-UDCard -Text "Filter: $($CardOutput)"
+
+                    New-UDLayout -Columns 4 -Content {
+                        New-UDCard -Title "vRO"  -TitleAlignment center -Text $vROText  -TextAlignment center -BackgroundColor $vRObgcolor
+                        New-UDCard -Title "SCCM" -TitleAlignment center -Text $SccmText -TextAlignment center -BackgroundColor $SCCMbgcolor
+                        New-UDCard -Title "WSUS" -TitleAlignment center -Text $WsusText -TextAlignment center -BackgroundColor $Wsusbgcolor
+                        New-UDCard -Title "BITS" -TitleAlignment center -Text $BitsText -TextAlignment center -BackgroundColor $Bitsbgcolor
+                    }
+
+                    <#
                     New-UDGrid -Title "vRO Workflow" -Endpoint {
                         $vRO | Select-Object Name,Property,Value | Out-UDGridData
                     } -NoFilter -NoExport -BackgroundColor $vRObgcolor
@@ -1565,18 +1591,22 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                     New-UDGrid -Title "BITS Service" -Endpoint {
                         $BitsService | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName | Out-UDGridData
                     } -NoFilter -NoExport -BackgroundColor $Bitsbgcolor
+                    #>
 
-                    New-UDGrid -Title "Installed Windows Update" -Endpoint {
-                        $InstalledWindowsUpdates | Select-Object InstalledOn,HotFixID,Description | Out-UDGridData
+                    New-UDLayout -Columns 1 -Content {
+                        New-UDGrid -Title "Installed Windows Update" -Endpoint {
+                            $InstalledWindowsUpdates | Select-Object InstalledOn,HotFixID,Description | Out-UDGridData
+                        }
+
+                        New-UDGrid -Title "Windows Update Handlerlog" -Endpoint {
+                            $WUAHandler | Out-UDGridData
+                        } -NoFilter -NoExport
+
+                        New-UDGrid -Title "Content of Windows Update Handlerlog" -Endpoint {
+                            $MissingWindowsUpdates | Select-Object DateTime,Message | Out-UDGridData
+                        } -DefaultSortColumn DateTime -DefaultSortDescending $true
                     }
 
-                    New-UDGrid -Title "Windows Update Handlerlog" -Endpoint {
-                        $WUAHandler | Out-UDGridData
-                    } -NoFilter -NoExport
-
-                    New-UDGrid -Title "Content from Windows Update Handlerlog" -Endpoint {
-                        $MissingWindowsUpdates | Select-Object DateTime,Message | Out-UDGridData
-                    } -DefaultSortColumn DateTime -DefaultSortDescending $true
                     <#      
                     New-UDGrid -Title "Windows Update Client Enventlog" -Endpoint {
                         $WindowsUpdateClientLog | Select-Object TimeCreated,Id,LevelDisplayName,Message | Out-UDGridData
@@ -1690,15 +1720,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
         New-UDHeading -Size 4 -Content { "vRAResource Tester" }
         New-UDHeading -Size 6 -Content { "List all Windows Virtual Machines for a Tenant (e.g. fornax-005)." }
         
-        Import-Module -Name CredentailManager
-        $defaultuser     = $env:USERNAME
-        if(Get-Module CredentialManager -ErrorAction SilentlyContinue){
-        $Credentials = Get-StoredCredential -Target 'RemoteOps'
-            if(![String]::IsNullOrEmpty($Credentials)){
-                New-UDCard -Title "Cached credentials" -Text "You can execute this function with cached login data for $($Credentials.Username) without entering user name and password."
-                $defaultuser     = $Credentials.Username
-            }
-        }
+        $defaultuser = $env:USERNAME
 
         New-UDLayout -Columns 1 -Content {
 
@@ -1730,13 +1752,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                     $OS
                 )
                 try{
-                    if(Get-Module CredentialManager -ErrorAction SilentlyContinue){
-                        $Credentials = Get-StoredCredential -Target 'RemoteOps'
-                        if([String]::IsNullOrEmpty($Credentials)){
-                            $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
-                            $Credentials = New-StoredCredential -Target 'RemoteOps' -UserName $Username -Password $secpasswd
-                        }
-                    }
+                    $secpasswd = ConvertTo-SecureString $Password -AsPlainText -Force
                     switch($Environment){
                         'DEV' {$vRAServer = 'cmp.dev-02.entcloud.swisscom.com'}
                         'INT' {$vRAServer = 'cmp.int-02.entcloud.swisscom.com'}
@@ -1744,7 +1760,7 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                         'PRD' {$vRAServer = 'cmp.entcloud.swisscom.com'}
                     }
                     Show-UDToast -Message "Connect-vRAServer -Server $($vRAServer) -Tenant $($Tenant) -Username $($Username)"
-                    $connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $Credentials.Username -Password $Credentials.Password -SslProtocol Tls12 -IgnoreCertRequirements
+                    $connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $Username -Password $secpasswd -SslProtocol Tls12 -IgnoreCertRequirements
                     if($connection){
                         if($VMName -eq 'All'){
                             $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), -> OS $($OS), -> Username $($Username)"
