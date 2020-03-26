@@ -529,7 +529,7 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-$UDTitle = "Remote Operating - v0.0.18-beta"
+$UDTitle = "Remote Operating - v0.0.19-beta"
 $Pages   = @()
 #endregion
 
@@ -650,23 +650,53 @@ $Pages += New-UDPage -Name "Getting Started" -Title "$($UDTitle)" -Content {
         }
         New-UDFabButton -Icon "question" -ButtonColor 'lightblue' -IconColor 'white' -onClick {
             Show-UDModal -Header {
-                New-UDHeading -Size 6 -Text "There is no Help available"
+                New-UDHeading -Size 6 -Text "Installation state"
             } -BottomSheet -Content {
-                #New-UDHtml 'There is no Help available'
+                New-UDHtml 'The Installation state of the listed Modules should be green, if one or more of theme are red, you should install it.'
             }
         }
     }
     New-UDLayout -Columns 1 -Content {
-
         New-UDHeading -Size 4 -Content { "Getting Started" }
         New-UDHtml "This Dashboard is written in PowerShell by Martin Walther, Swisscom (Schweiz) AG to simplify operating taks."
-
         New-UDHeading -Size 5 -Content { "Requirements" }
+    }
+
+    New-UDLayout -Columns 4 -Content {
+        if([String]::IsNullOrEmpty((Get-Module UniversalDashboard.Community -ListAvailable))){
+            $udcolor = 'indianred'
+        }else{
+            $udcolor = 'lightgreen'
+        }
+        New-UDCard -Title 'Installation state' -TitleAlignment center -Text "UniversalDashboard.Community" -TextAlignment center -BackgroundColor $udcolor
+
+        if([String]::IsNullOrEmpty((Get-Module PsNetTools -ListAvailable))){
+            $ptcolor = 'indianred'
+        }else{
+            $ptcolor = 'lightgreen'
+        }
+        New-UDCard -Title 'Installation state' -TitleAlignment center  -Text "PsNetTools" -TextAlignment center -BackgroundColor $ptcolor
+        
+        if([String]::IsNullOrEmpty((Get-Module CredentialManager -ListAvailable))){
+            $cmcolor = 'indianred'
+        }else{
+            $cmcolor = 'lightgreen'
+        }
+        New-UDCard -Title 'Installation state' -TitleAlignment center  -Text "CredentialManager" -TextAlignment center -BackgroundColor $cmcolor
+        
+        if([String]::IsNullOrEmpty((Get-Module PowervRA -ListAvailable))){
+            $vacolor = 'indianred'
+        }else{
+            $vacolor = 'lightgreen'
+        }
+        New-UDCard -Title 'Installation state' -TitleAlignment center  -Text "PowervRA" -TextAlignment center -BackgroundColor $vacolor
+    }
+
+    New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 6 -Content { "PowerShell Universal Dashboard" }
         New-UDHtml "Universal Dashboard is a cross-platform PowerShell module for developing and hosting web-based, interactive dashboards, websites and REST APIs with an ASP.NET web service."
         New-UDHtml 'Universal Dashboard requires .NET Framework version 4.7.2, <a href="https://dotnet.microsoft.com/download/dotnet-framework/net472">download .NET Framework 4.7.2</a>'
-        
         New-UDLayout -Columns 1 -Content {           
             New-UDCard -Text "Install-Module UniversalDashboard.Community -AcceptLicense -Force" -Links @(
                 New-UDLink -Url https://ironmansoftware.com/powershell-universal-dashboard/ -Text "Universal Dashboard"
@@ -674,15 +704,23 @@ $Pages += New-UDPage -Name "Getting Started" -Title "$($UDTitle)" -Content {
         }
 
         New-UDHeading -Size 6 -Content { "PowerShell PSNetTools" }
-        "PsNetTools is a cross platform PowerShell module to test network features on Windows, Mac and Linux."
+        New-UDHtml  "PsNetTools is a cross platform PowerShell module to test network features on Windows, Mac and Linux."
         New-UDLayout -Columns 1 -Content {           
             New-UDCard -Text "Download and install PsNetTools from github.com"-Links @(
                 New-UDLink -Url https://github.com/tinuwalther/PsNetTools/releases/download/v0.7.5/PsNetTools.zip -Text "Download PsNetTools"
             )
         }
 
+        New-UDHeading -Size 6 -Content { "PowerShell CredentialManager" }
+        New-UDHtml "CredentialManager is a PowerShell module that provides access to credentials in the Windows Credential Manager"
+        New-UDLayout -Columns 1 -Content {           
+            New-UDCard -Text "Install-Module CredentialManager" -Links @(
+                New-UDLink -Url http://blog.davotronic5000.co.uk/credential-manager-for-powershell/ -Text "CredentialManager"
+            )
+        }
+
         New-UDHeading -Size 6 -Content { "PowerShell PowervRA" }
-        "PowervRA is a PowerShell module built on top of the services exposed by the vRealize Automation 7 REST API."
+        New-UDHtml "PowervRA is a PowerShell module built on top of the services exposed by the vRealize Automation 7 REST API."
         New-UDLayout -Columns 1 -Content {           
             New-UDCard -Text "Install-Module PowervRA" -Links @(
                 New-UDLink -Url https://powervra.readthedocs.io/en/latest/ -Text "PowervRA"
