@@ -2,6 +2,10 @@
     Remote Operating runs as an ASP.NET web service on http://localhost:20001
 #>
 
+if(!(Get-StoredCredential -Target 'Workload')){
+    $null = New-StoredCredential -Target 'Workload' -Credentials (Get-Credential -UserName ("$($env:USERNAME)@swisscom.com").ToLower() -Message 'Enter your credentials for Workload-Access')
+}
+
 #region PowerShell Modules
 if(Get-Module UniversalDashboard.Community -ListAvailable){
     if(!(Get-Module UniversalDashboard.Community)){
@@ -40,32 +44,39 @@ if(Get-Module psPAS -ListAvailable){
 
 #region functions
 
-function Send-RemoteOperatingMail{
+function Set-ROpsCredential{
     [CmdletBinding()]
     param(
-        $MailMessage
+        $TargetName,
+        $Username,
+        $Password
     )
-    #$Sender      = 'user01@swisscom.com' -> kann nicht dynamisch ausgelesen werden
-    $Receipient  = 'martin.walther@swisscom.com'
-    switch($Computername){
-        'admin' {$SmtpServer  = "psrvcm02mxr0001.sccloudinfra.net"} #Service Tier 2
-        default {$SmtpServer  = "psrvcm02mxr0002.sccloudinfra.net"} #Service Tier 1
+
+    if(!(Get-Module CredentialManager -ErrorAction SilentlyContinue)){
+        Import-Module CredentialManager
     }
-    $Subject     = $UDTitle
-    $BodyMessage = "
-Hello
-
-This is a Mail-Notification from $($Computername):
-
-$MailMessage
-
-Regards
-$($Sender)
-   "
-    #Send-MailMessage -From $Sender -To $Receipient -SmtpServer $SmtpServer -Subject $Subject -Body $BodyMessage
+    $Credentials = Get-StoredCredential -Target $TargetName
+    if(!([String]::IsNullOrEmpty($Credentials))){
+        Remove-StoredCredential -Target $TargetName
+    }
+    $ROpsUsername = $Username
+    $ROpsPassword = ConvertTo-SecureString $Password -AsPlainText -Force
+    New-StoredCredential -Target $TargetName -UserName $ROpsUsername -Password $ROpsPassword | Out-Null
 }
 
-function Get-SccmAgent{
+function Get-ROpsCredential{
+    [CmdletBinding()]
+    param(
+        $TargetName
+    )
+
+    if(!(Get-Module CredentialManager -ErrorAction SilentlyContinue)){
+        Import-Module CredentialManager
+    }
+    Get-StoredCredential -Target $TargetName
+}
+
+function Get-ROpsSccmAgent{
     [CmdletBinding()]
     param(
         $RemoteSession,
@@ -88,7 +99,7 @@ function Get-SccmAgent{
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $SoftwareName
 }
 
-function Get-SccmService{
+function Get-ROpsSccmService{
     [CmdletBinding()]
     param(
         $RemoteSession,
@@ -101,7 +112,7 @@ function Get-SccmService{
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $ServiceName
 }
 
-function Get-SccmWUAHandlerLog{
+function Get-ROpsSccmWUAHandlerLog{
     [CmdletBinding()]
     param(
         $RemoteSession
@@ -179,7 +190,7 @@ function Get-SccmWUAHandlerLog{
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent
 }
 
-function Get-CyberArkPassword{
+function Get-ROpsCyberArkPassword{
 
     [CmdletBinding()]
     Param(
@@ -206,7 +217,7 @@ function Get-CyberArkPassword{
     return (ConvertTo-SecureString $Vault.Password -AsPlainText -Force)
 }
 
-function Get-WsusServer{
+function Get-ROpsWsusServer{
     [CmdletBinding()]
     param(
         $RemoteSession
@@ -226,7 +237,7 @@ function Get-WsusServer{
 
 }
 
-function Get-SCSServices{
+function Get-ROpsServices{
     [CmdletBinding()]
     param(
         $RemoteSession,
@@ -245,7 +256,7 @@ function Get-SCSServices{
 
 }
 
-function Get-SCSProcesses{
+function Get-ROpsProcesses{
     [CmdletBinding()]
     param(
         $RemoteSession
@@ -257,7 +268,7 @@ function Get-SCSProcesses{
 
 }
 
-function Get-InstalledUpdates{
+function Get-ROpsInstalledUpdates{
     [CmdletBinding()]
     param(
         $RemoteSession
@@ -269,7 +280,7 @@ function Get-InstalledUpdates{
 
 }
 
-function Get-FileProperties{
+function Get-ROpsFileProperties{
     [CmdletBinding()]
     param(
         $RemoteSession,
@@ -285,7 +296,7 @@ function Get-FileProperties{
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $File
 }
 
-function Get-SCSWindowsFeature{
+function Get-ROpsWindowsFeature{
     [CmdletBinding()]
     param(
         $RemoteSession
@@ -313,7 +324,7 @@ function Get-SCSWindowsFeature{
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent
 }
 
-function Get-FileContent{
+function Get-ROpsFileContent{
     [CmdletBinding()]
     param(
         $RemoteSession,
@@ -340,7 +351,7 @@ function Get-FileContent{
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $File
 }
 
-function Get-MissingUpdates{
+function Get-ROpsMissingUpdates{
     [CmdletBinding()]
     param(
         $RemoteSession
@@ -374,7 +385,7 @@ function Get-MissingUpdates{
 
 }
 
-function Get-WindowsUpdateClientLog{
+function Get-ROpsWindowsUpdateClientLog{
     [CmdletBinding()]
     param(
         $RemoteSession
@@ -390,7 +401,7 @@ function Get-WindowsUpdateClientLog{
 
 }
 
-function Get-SCSWindowsEventLog{
+function Get-ROpsWindowsEventLog{
     [CmdletBinding()]
     param(
         $RemoteSession,
@@ -418,7 +429,7 @@ function Get-SCSWindowsEventLog{
     #Invoke-Command -ScriptBlock $ScriptBlockContent -ArgumentList $EventlogName,$Level,$MaxEvents
 }
 
-function Get-SCSRegistryItem{
+function Get-ROpsRegistryItem{
     [CmdletBinding()]
     param(
         $RemoteSession,
@@ -446,7 +457,7 @@ function Get-SCSRegistryItem{
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $RegistryPath
 }
 
-function Get-SCSRegistryChildItem{
+function Get-ROpsRegistryChildItem{
     [CmdletBinding()]
     param(
         $RemoteSession,
@@ -474,7 +485,7 @@ function Get-SCSRegistryChildItem{
     Invoke-Command -Session $RemoteSession -ScriptBlock $ScriptBlockContent -ArgumentList $RegistryPath
 }
 
-function Get-vRaResourceData{
+function Get-ROpsvRaResourceData{
     [CmdletBinding()]
     param(
         $Resource
@@ -529,7 +540,7 @@ function Invoke-SCSScriptBlock{
 #endregion
 
 #region Generall
-$UDTitle = "Remote Operating - v0.0.19-beta"
+$UDTitle = "Remote Operating - v0.0.20-beta"
 $Pages   = @()
 #endregion
 
@@ -853,19 +864,30 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
             }
         }
     }
+
     New-UDLayout -Columns 1 -Content {
 
         New-UDHeading -Size 4 -Content { "Access Tester" }
         New-UDHeading -Size 6 -Content { "Test WinRM access to a remote host. You need a user account who is member of the local Administrators of the remote Host." }
 
         New-UDLayout -Columns 1 -Content {
-            
+
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+                            
             New-UDInput -Title "Remote Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username   -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password   -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Name or IP Address'
             } -Validate -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -875,17 +897,24 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
                     [Parameter(Mandatory)]
                     $Remotehost
                 )
-                Show-UDToast -Message "Send Tests to $Remotehost"
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
-                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
-                        if($rsession.State -eq 'Opened'){
+                        switch($Credential){
+                            'current' {
+                                $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                                $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                                Show-UDToast -Message "Send Tests to $Remotehost"
+                            }
+                            'cached' {
+                                Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                            }
+                        }
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $CachedCreds -ErrorAction SilentlyContinue
+                        if($rsession){
                             $RemoteReturn = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
-                            $TestReturn = [PSCustomObject]@{
+                            $CardOutput = "$($Remotehost) -> ComputerName: $($RemoteReturn) -> Username: $($CachedCreds.Username)"
+                            $AccessReturn = [PSCustomObject]@{
                                 Input           = $Remotehost
                                 'Session Id'    = $($rsession.Id)
                                 'Session Name'  = $($rsession.Name)
@@ -907,14 +936,22 @@ $Pages += New-UDPage -Name "Access Tester" -Title "$($UDTitle)" -Content {
                 }
                 New-UDInputAction -Content @(
                     New-UDCard -Text "Filter: $($CardOutput)"
-                    New-UDGrid -Title "Details" -Endpoint {
-                        $TestReturn | Out-UDGridData
+                    New-UDLayout -Columns 2 -Content {
+                        New-UDGrid -Title "Port Test" -Endpoint {
+                            $TestReturn | Select-Object TcpSucceeded,TcpPort,TimeStamp,Destination,StatusDescription,TimeMs | Out-UDGridData
+                        } -NoFilter
+                        New-UDGrid -Title "Access Test" -Endpoint {
+                            $AccessReturn | Out-UDGridData
+                        } -NoFilter
                     }
                 )
             }
-        }
-    }
-}
+
+        } #end UDLayout
+
+    } #end UDLayout
+
+} #end Page
 #endregion
 
 #region "Windows Update Tester"
@@ -939,12 +976,22 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
 
         New-UDLayout -Columns 1 -Content {
             
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+
             New-UDInput -Title "Remote Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username   -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password   -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Name or IP Address'
             } -Validate -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -954,23 +1001,31 @@ $Pages += New-UDPage -Name "Windows Updates Tester" -Title "$($UDTitle)" -Conten
                     [Parameter(Mandatory)]
                     $Remotehost
                 )
-                Show-UDToast -Message "Send Tests to $Remotehost"
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
-                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        switch($Credential){
+                            'current' {
+                                $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                                $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                                Show-UDToast -Message "Send Tests to $Remotehost"
+                            }
+                            'cached' {
+                                Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                            }
+                        }
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $CachedCreds -ErrorAction SilentlyContinue
                         if($rsession.State -eq 'Opened'){
-                            Show-UDToast -Message "Collect data from registry"
-                            $WSUServerConfiguration  = Get-WsusServer -RemoteSession $rsession
-                            Show-UDToast -Message "Collect installed Windows Update"
-                            $InstalledWindowsUpdates = Get-InstalledUpdates -RemoteSession $rsession
-                            Show-UDToast -Message "Collect missing Windows Update"
-                            $MissingWindowsUpdates   = Get-MissingUpdates -RemoteSession $rsession
-                            Show-UDToast -Message "Collect data from Windows Update Clientlog"
-                            $WindowsUpdateClientLog  = Get-WindowsUpdateClientLog -RemoteSession $rsession
-                            $CardOutput = "Input: $($Remotehost) -> ComputerName: $(Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME})"
+                            $RemoteReturn = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
+                            $CardOutput = "$($Remotehost) -> ComputerName: $($RemoteReturn) -> Username: $($CachedCreds.Username)"
+                            #Show-UDToast -Message "Collect data from registry"
+                            $WSUServerConfiguration  = Get-ROpsWsusServer -RemoteSession $rsession
+                            #Show-UDToast -Message "Collect installed Windows Update"
+                            $InstalledWindowsUpdates = Get-ROpsInstalledUpdates -RemoteSession $rsession
+                            #Show-UDToast -Message "Collect missing Windows Update"
+                            $MissingWindowsUpdates   = Get-ROpsMissingUpdates -RemoteSession $rsession
+                            #Show-UDToast -Message "Collect data from Windows Update Clientlog"
+                            $WindowsUpdateClientLog  = Get-ROpsWindowsUpdateClientLog -RemoteSession $rsession
 
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
@@ -1032,7 +1087,14 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
 
         New-UDLayout -Columns 1 -Content {
             
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+
             New-UDInput -Title "Remote Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username   -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password   -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost -Placeholder 'Name or IP Address'
@@ -1041,6 +1103,9 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
                 New-UDInputField -Type select   -Name MaxEvents  -Values @('50','500','5000','50000')
             } -Validate -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -1059,18 +1124,25 @@ $Pages += New-UDPage -Name "Windows Eventlog Tester" -Title "$($UDTitle)" -Conte
                     [Parameter(Mandatory)]
                     $MaxEvents
                 )
-                Show-UDToast -Message "Send Tests to $Remotehost"
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
-                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        switch($Credential){
+                            'current' {
+                                $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                                $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                                Show-UDToast -Message "Send Tests to $Remotehost"
+                            }
+                            'cached' {
+                                Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                            }
+                        }
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $CachedCreds -ErrorAction SilentlyContinue
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput   = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn) -> Eventlog: $($Eventlog) -> Level: $($Level) -> MaxEvents: $($MaxEvents)"
-                            Show-UDToast -Message "Collect data"
-                            $TestReturn   = Get-SCSWindowsEventLog -RemoteSession $rsession -EventlogName $Eventlog -Level $Level -MaxEvents $MaxEvents
+                            $CardOutput   = "$($Remotehost) -> ComputerName: $($RemoteReturn) -> Username: $($CachedCreds.Username) -> Eventlog: $($Eventlog) -> Level: $($Level) -> MaxEvents: $($MaxEvents)"
+                            #Show-UDToast -Message "Collect data"
+                            $TestReturn   = Get-ROpsWindowsEventLog -RemoteSession $rsession -EventlogName $Eventlog -Level $Level -MaxEvents $MaxEvents
                         }else{
                             $TestReturn = "Session to $Remotehost is $($rsession.State)"
                         }
@@ -1117,13 +1189,23 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
 
         New-UDLayout -Columns 1 -Content {
             
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+
             New-UDInput -Title "Remote Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
                 New-UDInputField -Type textbox  -Name RegistryPath -Placeholder 'Registry Path'
             } -Validate -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -1136,19 +1218,26 @@ $Pages += New-UDPage -Name "Windows Registry Tester" -Title "$($UDTitle)" -Conte
                     [Parameter(Mandatory)]
                     $RegistryPath
                 )
-                Show-UDToast -Message "Send Tests to $Remotehost"
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
-                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        switch($Credential){
+                            'current' {
+                                $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                                $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                                Show-UDToast -Message "Send Tests to $Remotehost"
+                            }
+                            'cached' {
+                                Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                            }
+                        }
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $CachedCreds -ErrorAction SilentlyContinue
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn      = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput        = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn) -> $($RegistryPath)"
-                            Show-UDToast -Message "Collect data"
-                            $RegistryItem      = Get-SCSRegistryItem -RemoteSession $rsession -RegistryPath $RegistryPath
-                            $RegistryChildItem = Get-SCSRegistryChildItem -RemoteSession $rsession -RegistryPath $RegistryPath
+                            $CardOutput        = "$($Remotehost) -> ComputerName: $($RemoteReturn) -> Username: $($CachedCreds.Username) -> $($RegistryPath)"
+                            #Show-UDToast -Message "Collect data"
+                            $RegistryItem      = Get-ROpsRegistryItem -RemoteSession $rsession -RegistryPath $RegistryPath
+                            $RegistryChildItem = Get-ROpsRegistryChildItem -RemoteSession $rsession -RegistryPath $RegistryPath
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
                         }
@@ -1201,13 +1290,23 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
 
         New-UDLayout -Columns 1 -Content {
             
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+
             New-UDInput -Title "Remote Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
                 New-UDInputField -Type textbox  -Name FilePath     -Placeholder 'File Path'
             } -Validate -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -1220,19 +1319,26 @@ $Pages += New-UDPage -Name "Windows File Reader" -Title "$($UDTitle)" -Content {
                     [Parameter(Mandatory)]
                     $FilePath
                 )
-                Show-UDToast -Message "Send Tests to $Remotehost"
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
-                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        switch($Credential){
+                            'current' {
+                                $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                                $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                                Show-UDToast -Message "Send Tests to $Remotehost"
+                            }
+                            'cached' {
+                                Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                            }
+                        }
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $CachedCreds -ErrorAction SilentlyContinue
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn) -> $($FilePath)"
-                            Show-UDToast -Message "Collect data"
-                            $FileProperties = Get-FileProperties -RemoteSession $rsession -File $FilePath
-                            $FileContent    = Get-FileContent    -RemoteSession $rsession -File $FilePath
+                            $CardOutput     = "$($Remotehost) -> ComputerName: $($RemoteReturn) -> Username: $($CachedCreds.Username) -> $($FilePath)"
+                            #Show-UDToast -Message "Collect data"
+                            $FileProperties = Get-ROpsFileProperties -RemoteSession $rsession -File $FilePath
+                            $FileContent    = Get-ROpsFileContent    -RemoteSession $rsession -File $FilePath
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
                         }
@@ -1291,13 +1397,23 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
 
         New-UDLayout -Columns 1 -Content {
             
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+
             New-UDInput -Title "Remote Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
                 New-UDInputField -Type select   -Name State        -Values @('All','Running','Stopped')
             } -Validate -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -1310,18 +1426,25 @@ $Pages += New-UDPage -Name "Windows Service Tester" -Title "$($UDTitle)" -Conten
                     [Parameter(Mandatory)]
                     $State
                 )
-                Show-UDToast -Message "Send Tests to $Remotehost"
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
-                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        switch($Credential){
+                            'current' {
+                                $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                                $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                                Show-UDToast -Message "Send Tests to $Remotehost"
+                            }
+                            'cached' {
+                                Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                            }
+                        }
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $CachedCreds -ErrorAction SilentlyContinue
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
-                            Show-UDToast -Message "Collect data"
-                            $TestResult     = Get-SCSServices -RemoteSession $rsession -State $State
+                            $CardOutput     = "$($Remotehost) -> ComputerName: $($RemoteReturn) -> Username: $($CachedCreds.Username)"
+                            #Show-UDToast -Message "Collect data"
+                            $TestResult     = Get-ROpsServices -RemoteSession $rsession -State $State
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
                         }
@@ -1369,12 +1492,22 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
 
         New-UDLayout -Columns 1 -Content {
             
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+
             New-UDInput -Title "Remote Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
             } -Validate -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -1384,18 +1517,25 @@ $Pages += New-UDPage -Name "Windows Process Tester" -Title "$($UDTitle)" -Conten
                     [Parameter(Mandatory)]
                     $Remotehost
                 )
-                Show-UDToast -Message "Send Tests to $Remotehost"
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
-                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        switch($Credential){
+                            'current' {
+                                $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                                $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                                Show-UDToast -Message "Send Tests to $Remotehost"
+                            }
+                            'cached' {
+                                Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                            }
+                        }
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $CachedCreds -ErrorAction SilentlyContinue
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
-                            Show-UDToast -Message "Collect data"
-                            $TestResult     = Get-SCSProcesses -RemoteSession $rsession
+                            $CardOutput     = "$($Remotehost) -> ComputerName: $($RemoteReturn) -> Username: $($CachedCreds.Username)"
+                            #Show-UDToast -Message "Collect data"
+                            $TestResult     = Get-ROpsProcesses -RemoteSession $rsession
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
                         }
@@ -1442,12 +1582,22 @@ $Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Conten
 
         New-UDLayout -Columns 1 -Content {
             
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+
             New-UDInput -Title "Remote Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
             } -Validate -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -1457,17 +1607,24 @@ $Pages += New-UDPage -Name "Windows Feature Tester" -Title "$($UDTitle)" -Conten
                     [Parameter(Mandatory)]
                     $Remotehost
                 )
-                Show-UDToast -Message "Send Tests to $Remotehost"
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
-                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        switch($Credential){
+                            'current' {
+                                $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                                $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                                Show-UDToast -Message "Send Tests to $Remotehost"
+                            }
+                            'cached' {
+                                Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                            }
+                        }
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $CachedCreds -ErrorAction SilentlyContinue
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
-                            $TestResult     = Get-SCSWindowsFeature -RemoteSession $rsession
+                            $CardOutput     = "$($Remotehost) -> ComputerName: $($RemoteReturn) -> Username: $($CachedCreds.Username)"
+                            $TestResult     = Get-ROpsWindowsFeature -RemoteSession $rsession
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
                         }
@@ -1514,13 +1671,23 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
         New-UDHeading -Size 6 -Content { "List SCCM Patching properties from a remote Host" }
 
         New-UDLayout -Columns 1 -Content {
-            
+
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+
             New-UDInput -Title "Remote Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
             } -Validate -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -1530,19 +1697,26 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                     [Parameter(Mandatory)]
                     $Remotehost
                 )
-                Show-UDToast -Message "Send Tests to $Remotehost"
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
-                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        switch($Credential){
+                            'current' {
+                                $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                                $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                                Show-UDToast -Message "Send Tests to $Remotehost"
+                            }
+                            'cached' {
+                                Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                            }
+                        }
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $CachedCreds -ErrorAction SilentlyContinue
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
+                            $CardOutput     = "$($Remotehost) -> ComputerName: $($RemoteReturn) -> Username: $($CachedCreds.Username)"
                             
-                            Show-UDToast -Message "Collect data from registry"
-                            $vRO  = Get-SCSRegistryItem -RemoteSession $rsession -RegistryPath 'HKLM:\Software\Swisscom\SCCM'
+                            #Show-UDToast -Message "Collect data from registry"
+                            $vRO  = Get-ROpsRegistryItem -RemoteSession $rsession -RegistryPath 'HKLM:\Software\Swisscom\SCCM'
                             if([String]::IsNullOrEmpty($vRO.Value)){
                                 $vROText    = "Trigger: not found"
                                 $vRObgcolor = 'lightgreen'
@@ -1551,7 +1725,7 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                                 $vRObgcolor = 'indianred'
                             }
 
-                            $SCCM = Get-SCSRegistryItem -RemoteSession $rsession -RegistryPath 'HKLM:\Software\Swisscom\WindowsUpdate'
+                            $SCCM = Get-ROpsRegistryItem -RemoteSession $rsession -RegistryPath 'HKLM:\Software\Swisscom\WindowsUpdate'
                             if([String]::IsNullOrEmpty($SCCM.Value)){
                                 $SccmText    = "LastPatchRun: not found"
                                 $SCCMbgcolor = 'indianred'
@@ -1560,7 +1734,7 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                                 $SCCMbgcolor = 'lightgreen'
                             }
 
-                            $WSUServerConfiguration  = Get-WsusServer -RemoteSession $rsession
+                            $WSUServerConfiguration  = Get-ROpsWsusServer -RemoteSession $rsession
                             if($WSUServerConfiguration.Status -match 'OK'){
                                 $WsusText    = "Access Status: $($WSUServerConfiguration.Status)"
                                 $Wsusbgcolor = 'lightgreen'
@@ -1569,8 +1743,8 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                                 $Wsusbgcolor = 'indianred'
                             }
 
-                            Show-UDToast -Message "Collect BITS Service properties"
-                            $BitsService  = Get-SccmService -RemoteSession $rsession -ServiceName "BITS"
+                            #Show-UDToast -Message "Collect BITS Service properties"
+                            $BitsService  = Get-ROpsSccmService -RemoteSession $rsession -ServiceName "BITS"
                             if($BitsService.StartMode -match 'disabled'){
                                 $BitsText    = "Service StartMode: $($BitsService.StartMode)"
                                 $Bitsbgcolor = 'indianred'
@@ -1579,18 +1753,18 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                                 $Bitsbgcolor = 'lightgreen'
                             }
 
-                            Show-UDToast -Message "Collect installed Windows Updates"
-                            $InstalledWindowsUpdates = Get-InstalledUpdates -RemoteSession $rsession
-                            Show-UDToast -Message "Collect data from WUAHandlerLog"
-                            $wulog = Get-FileProperties  -RemoteSession $rsession -File "C:\Windows\CCM\Logs\WUAHandler.log"
+                            #Show-UDToast -Message "Collect installed Windows Updates"
+                            $InstalledWindowsUpdates = Get-ROpsInstalledUpdates -RemoteSession $rsession
+                            #Show-UDToast -Message "Collect data from WUAHandlerLog"
+                            $wulog = Get-ROpsFileProperties  -RemoteSession $rsession -File "C:\Windows\CCM\Logs\WUAHandler.log"
                             $WUAHandler = [PSCustomObject]@{
                                 LastWriteTime = $wulog.LastWriteTime
                                 Name          = $wulog.Name
                                 FullName      = $wulog.FullName
                             }
-                            $MissingWindowsUpdates   = Get-SccmWUAHandlerLog -RemoteSession $rsession
+                            $MissingWindowsUpdates   = Get-ROpsSccmWUAHandlerLog -RemoteSession $rsession
                             #Show-UDToast -Message "Collect data from Windows Update Clientlog"
-                            #$WindowsUpdateClientLog  = Get-WindowsUpdateClientLog -RemoteSession $rsession
+                            #$WindowsUpdateClientLog  = Get-ROpsWindowsUpdateClientLog -RemoteSession $rsession
 
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
@@ -1615,22 +1789,6 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                         New-UDCard -Title "BITS" -TitleAlignment center -Text $BitsText -TextAlignment center -BackgroundColor $Bitsbgcolor
                     }
 
-                    <#
-                    New-UDGrid -Title "vRO Workflow" -Endpoint {
-                        $vRO | Select-Object Name,Property,Value | Out-UDGridData
-                    } -NoFilter -NoExport -BackgroundColor $vRObgcolor
-                    New-UDGrid -Title "SCCM Workflow" -Endpoint {
-                        $SCCM | Select-Object Name,Property,Value | Out-UDGridData
-                    } -NoFilter -NoExport -BackgroundColor $SCCMbgcolor
-
-                    New-UDGrid -Title "Windows Server Update Service" -Endpoint {
-                        $WSUServerConfiguration | Select-Object URI,ServerName,TcpPort,Status | Out-UDGridData
-                    } -NoFilter -NoExport -BackgroundColor $Wsusbgcolor
-                    New-UDGrid -Title "BITS Service" -Endpoint {
-                        $BitsService | Select-Object ProcessId,Name,DisplayName,Description,StartMode,State,Status,PathName,StartName | Out-UDGridData
-                    } -NoFilter -NoExport -BackgroundColor $Bitsbgcolor
-                    #>
-
                     New-UDLayout -Columns 1 -Content {
                         New-UDGrid -Title "Installed Windows Update" -Endpoint {
                             $InstalledWindowsUpdates | Select-Object InstalledOn,HotFixID,Description | Out-UDGridData
@@ -1645,11 +1803,6 @@ $Pages += New-UDPage -Name "SCCM Patching Tester" -Title "$($UDTitle)" -Content 
                         } -DefaultSortColumn DateTime -DefaultSortDescending $true
                     }
 
-                    <#      
-                    New-UDGrid -Title "Windows Update Client Enventlog" -Endpoint {
-                        $WindowsUpdateClientLog | Select-Object TimeCreated,Id,LevelDisplayName,Message | Out-UDGridData
-                    }
-                    #>
                 )
             }
         }
@@ -1679,12 +1832,22 @@ $Pages += New-UDPage -Name "SCCM Agent Tester" -Title "$($UDTitle)" -Content {
 
         New-UDLayout -Columns 1 -Content {
             
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+
             New-UDInput -Title "Remote Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username'
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type textbox  -Name Remotehost   -Placeholder 'Name or IP Address'
             } -Validate -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -1694,20 +1857,27 @@ $Pages += New-UDPage -Name "SCCM Agent Tester" -Title "$($UDTitle)" -Content {
                     [Parameter(Mandatory)]
                     $Remotehost
                 )
-                Show-UDToast -Message "Send Tests to $Remotehost"
                 try{
                     $TestReturn = Test-PsNetTping -Destination $Remotehost -TcpPort 5985
                     if($TestReturn.TcpSucceeded){
-                        $secpasswd  = ConvertTo-SecureString $Password -AsPlainText -Force
-                        $mycreds    = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $mycreds
+                        switch($Credential){
+                            'current' {
+                                $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                                $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                                Show-UDToast -Message "Send Tests to $Remotehost"
+                            }
+                            'cached' {
+                                Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                            }
+                        }
+                        $rsession   = New-PSSession -ComputerName $RemoteHost -Credential $CachedCreds -ErrorAction SilentlyContinue
                         if($rsession.State -eq 'Opened'){
                             $RemoteReturn   = Invoke-Command -Session $rsession -ScriptBlock {$env:COMPUTERNAME}
-                            $CardOutput     = "Input: $($Remotehost) -> ComputerName: $($RemoteReturn)"
-                            Show-UDToast -Message "Search for installed SCCM Agent Software"
-                            $SccmAgent      = Get-SccmAgent -RemoteSession $rsession -SoftwareName "Configuration Manager Client"
-                            Show-UDToast -Message "Collect SCCM Service properties"
-                            $SccmService    = Get-SccmService -RemoteSession $rsession -ServiceName "CcmExec"
+                            $CardOutput     = "$($Remotehost) -> ComputerName: $($RemoteReturn) -> Username: $($CachedCreds.Username)"
+                            #Show-UDToast -Message "Search for installed SCCM Agent Software"
+                            $SccmAgent      = Get-ROpsSccmAgent -RemoteSession $rsession -SoftwareName "Configuration Manager Client"
+                            #Show-UDToast -Message "Collect SCCM Service properties"
+                            $SccmService    = Get-ROpsSccmService -RemoteSession $rsession -ServiceName "CcmExec"
                         }else{
                             $CardOutput = "Session to $Remotehost is $($rsession.State)"
                         }
@@ -1762,7 +1932,14 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
 
         New-UDLayout -Columns 1 -Content {
 
+            $CachedCreds = Get-ROpsCredential -TargetName 'Workload'
+
             New-UDInput -Title "vRA Information" -Content {
+                if($CachedCreds){
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @("Use cached credentials $($CachedCreds.UserName)") -Values @('cached') -DefaultValue 'current'
+                }else{
+                    New-UDInputField -Type radioButtons -Name Credential -Placeholder @('Use this credentials') -Values @('current') -DefaultValue 'current' -Disabled
+                }
                 New-UDInputField -Type textbox  -Name Username     -Placeholder 'Username' -DefaultValue $defaultuser
                 New-UDInputField -Type password -Name Password     -Placeholder 'Password'
                 New-UDInputField -Type select   -Name Environment  -Values @( 'PRD','CAT','INT','DEV')
@@ -1771,6 +1948,9 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                 New-UDInputField -Type select   -Name OS           -Values @('All','Windows','Linux')
             } -Endpoint {
                 param(
+                    [Parameter(Mandatory=$false)]
+                    $Credential, 
+
                     [Parameter(Mandatory)]
                     $Username, 
 
@@ -1797,23 +1977,34 @@ $Pages += New-UDPage -Name "vRAResource Tester" -Title "$($UDTitle)" -Content {
                         'CAT' {$vRAServer = 'cmp.cat.entcloud.swisscom.com'}
                         'PRD' {$vRAServer = 'cmp.entcloud.swisscom.com'}
                     }
-                    Show-UDToast -Message "Connect-vRAServer -Server $($vRAServer) -Tenant $($Tenant) -Username $($Username)"
-                    $connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $Username -Password $secpasswd -SslProtocol Tls12 -IgnoreCertRequirements
+                    switch($Credential){
+                        'current' {
+                            $secpasswd   = ConvertTo-SecureString $Password -AsPlainText -Force
+                            $CachedCreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
+                            Show-UDToast -Message "Send Tests to $Remotehost"
+                        }
+                        'cached' {
+                            Show-UDToast -Message "Send Tests to $Remotehost with cashed credentials"
+                        }
+                    }
+                    #Show-UDToast -Message "Connect-vRAServer -Server $($vRAServer) -Tenant $($Tenant) -Username $($CachedCreds.Username)"
+                    $connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $CachedCreds.Username -Password $CachedCreds.Password -SslProtocol Tls12 -IgnoreCertRequirements
+                    #$connection  = Connect-vRAServer -Server $vRAServer -Tenant $Tenant -Username $Username -Password $secpasswd -SslProtocol Tls12 -IgnoreCertRequirements
                     if($connection){
                         if($VMName -eq 'All'){
-                            $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), -> OS $($OS), -> Username $($Username)"
+                            $CardOutput = "Environment: ($Environment) -> vRAServer: $($vRAServer) -> Tenant: $($Tenant) -> OS: $($OS) -> Username: $($CachedCreds.Username)"
                             switch($OS){
                                 'All'     {$vRAMachineResource = Get-vRAResource -Type Machine}
                                 'Windows' {$vRAMachineResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Windows'}}
                                 'Linux'   {$vRAMachineResource = Get-vRAResource -Type Machine | Where-Object {$_.Data.MachineGuestOperatingSystem -match 'Linux'}}
                             }
                         }else{
-                            $CardOutput = "Environment -> ($Environment), vRAServer -> $($vRAServer), Tenant -> $($Tenant), VMName -> $($VMName) -> OS $($OS), -> Username $($Username)"
+                            $CardOutput = "Environment: ($Environment) -> vRAServer: $($vRAServer) -> Tenant: $($Tenant) -> VMName: $($VMName) -> OS: $($OS) -> Username: $($CachedCreds.Username)"
                             $vRAMachineResource = Get-vRAResource -Name $VMName
                         }
-                        Show-UDToast -Message "Collect data from resources"
+                        #Show-UDToast -Message "Collect data from resources"
                         if($vRAMachineResource){
-                            $TestResult = Get-vRaResourceData -Resource $vRAMachineResource
+                            $TestResult = Get-ROpsvRaResourceData -Resource $vRAMachineResource
                         }
                         else{
                             $CardOutput = "No resources found in $($vRAServer) for Tenant $($Tenant) as User $($Username)."
@@ -1879,6 +2070,7 @@ $Navigation = New-UDSideNav -Content {
 #endregion
 
 #region Start
+
 $Footer = New-UDFooter -Links @(
     New-UDLink -Text ", from Ironman Software" -Url "https://ironmansoftware.com"
 )
@@ -1891,6 +2083,7 @@ Start-Process "http://localhost:20001/Home"
 
 <#
 Get-UDDashboard -Name "OpsRemoteWinRM" | Stop-UDDashboard
+Remove-StoredCredential -Target  'Workload'
 #>
 
 #endregion
