@@ -12,9 +12,26 @@
     https://pode.readthedocs.io/en/latest/Tutorials/OpenAPI/#default-setup
 
 .EXAMPLE
-    Invoke-RestMethod -Method Get -Uri http://localhost:8080/api/computer/"{ 'name': 'lnx1234', 'os': 'Red Hat', version: '8' }"
+    $body = @{
+        name     = 'lnx1234'
+        os       = 'Red Hat'
+        version  = '8'
+        ipv4addr = '10.26.0.34'
+        subnet   = '255.255.255.0'
+        owner    = 'tinu'
+        action   = 'create'
+    } | ConvertTo-Json -Compress
+
+    $Properties = @{
+        Method = 'POST'
+        Uri    = "http://localhost:8080/api/vm/$($body)"
+    }
+
+    Invoke-RestMethod @Properties
 
 #>
+[CmdletBinding()]
+param()
 
 function Get-MWASecretsFromVault{
     [CmdletBinding()]
@@ -157,9 +174,9 @@ function Test-Output{
         }
         Write-Host "OS         : $($Data.os)"
         Write-Host "Name       : $($Data.name)"
-        Write-Host "IPv4Address: $($Data.ipv4addr)"
         Write-Host "Subnet     : $($Data.subnet)"
         Write-Host "Owner      : $($Data.owner)"
+        Write-Host "Action     : $($Data.action)"
     }else{
         Write-Warning "InputObject is not a PSCustomObject"
     }
@@ -175,18 +192,18 @@ function Invoke-PodeJsonResponse{
         Rest-Method to retrieve a Pode-Response as JSON
 
     .PARAMETER ApiUri
-        URI of the API Route, for example http://localhost:8080/api/computer/
+        URI of the API Route, for example http://localhost:8080/api/vm/
 
     .PARAMETER ApiData
         Data as JSON-String, for example "{ 'name': 'lnx1234', 'os': 'Red Hat' }"
 
     .EXAMPLE
-        Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/computer/"{ name: 'lnx1234', os: 'Red Hat', ipv4addr: '10.26.0.34', subnet: '255.255.255.0', owner: 'tinu' }"
+        Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/vm/"{ name: 'lnx1234', os: 'Red Hat', ipv4addr: '10.26.0.34', subnet: '255.255.255.0', owner: 'tinu' }"
     #>
     [CmdletBinding()]
     param(
         [Parameter(
-            HelpMessage = 'http://localhost:8080/api',
+            HelpMessage = 'http://localhost:8080/api/vm',
             Mandatory=$true,
             ValueFromPipeline=$true,
             ValueFromPipelineByPropertyName=$true,
@@ -217,46 +234,38 @@ function Invoke-PodeJsonResponse{
             Add-PodeRoute -Method Post -Path "$($ApiUri)/$($ApiData)" -ScriptBlock {
 
                 $ret = [PSCustomObject]@{
-                    TimeStamp   = Get-Date -f 'yyyy-MM-dd HH:mm:ss.fff'
-                    Uuid        = (New-Guid | Select-Object -ExpandProperty Guid)
-                    Source      = $env:COMPUTERNAME
-                    Data        = ($WebEvent.Parameters['json']) | ConvertFrom-Json
-                    IPv4Address = 'Get-NextFreeIpAddress()'
+                    StatusCode        = 200
+                    StatusDescription = 'OK'
+                    TimeStamp         = Get-Date -f 'yyyy-MM-dd HH:mm:ss.fff'
+                    Uuid              = (New-Guid | Select-Object -ExpandProperty Guid)
+                    Source            = $env:COMPUTERNAME
+                    Data              = ($WebEvent.Parameters['json']) | ConvertFrom-Json
                 }
 
                 Test-Output -OutputObject $ret
 
                 #region Secret
-                $SecretVault  = 'PSOctomes'
-                $AllSecrets   = Get-MWASecretsFromVault -Vault $SecretVault
-                $SecretObject = foreach($item in $AllSecrets){
-                    try{
-                        $Secret = Get-Secret -Vault $SecretVault -Name $item.Name -ErrorAction Stop
-                        [PSCustomObject]@{
-                            Name   = $item.Name
-                            User   = $Secret.UserName
-                            ApiUri = $item.ApiUri
-                            Token = [System.Net.NetworkCredential]::new($Secret.UserName, $Secret.Password).Password
-                        }
-                    }catch{
-                        $Error.Clear()
-                    }
-                }
+                # $SecretVault  = 'PSOctomes'
+                # $AllSecrets   = Get-MWASecretsFromVault -Vault $SecretVault
+                # $SecretObject = foreach($item in $AllSecrets){
+                #     try{
+                #         $Secret = Get-Secret -Vault $SecretVault -Name $item.Name -ErrorAction Stop
+                #         [PSCustomObject]@{
+                #             Name   = $item.Name
+                #             User   = $Secret.UserName
+                #             ApiUri = $item.ApiUri
+                #             Token = [System.Net.NetworkCredential]::new($Secret.UserName, $Secret.Password).Password
+                #         }
+                #     }catch{
+                #         $Error.Clear()
+                #     }
+                # }                
+                # Send-TelegramMessage -Message $ret -Html -PSOctomes $SecretObject
                 #endregion
-                
-                Send-TelegramMessage -Message $ret -Html -PSOctomes $SecretObject
 
                 Write-PodeJsonResponse -Value $ret
 
-            } -PassThru  | Add-PodeOAResponse -StatusCode 200 -Description 'A computer object' -ContentSchemas @{
-                'application/json' = (
-                    New-PodeOAObjectProperty -Properties @(
-                        (New-PodeOAIntProperty -Name 'Uuid')
-                    )
-                )
-            }
-
-            Write-Host $ret
+            } -PassThru # needed for Test-Output
 
         }catch{
             Write-Warning $('ScriptName:', $($_.InvocationInfo.ScriptName), 'LineNumber:', $($_.InvocationInfo.ScriptLineNumber), 'Message:', $($_.Exception.Message) -Join ' ')
@@ -282,6 +291,7 @@ Start-PodeServer {
     Write-Host "Press Ctrl. + C to terminate the Pode server" -ForegroundColor Yellow
 
     Add-PodeEndpoint -Address localhost -Port 8080 -Protocol Http
-    Invoke-PodeJsonResponse -ApiUri '/api/computer' -ApiData ':json'
+
+    Invoke-PodeJsonResponse -ApiUri '/api/vm' -ApiData ':json'
 
 }
