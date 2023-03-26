@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    A short one-line action-based description, e.g. 'Tests if a function is valid'
+    A Pode API server
 
 .DESCRIPTION
-    A longer description of the function, its purpose, common use cases, etc.
+    Run a Pode API server to creat a VM in a vCenter, or maybe not?
 
 .NOTES
     Information or caveats about the function e.g. 'This function is not supported in Linux'
@@ -12,6 +12,14 @@
     https://pode.readthedocs.io/en/latest/Tutorials/OpenAPI/#default-setup
 
 .EXAMPLE
+    $creds = Get-Credential -Message 'Enter the password' -UserName 'morty'
+    $token = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("$($creds.UserName):$($creds.GetNetworkCredential().Password)"))
+
+    $headers = @{
+        'Content-Type'  = 'application/json'
+        'Authorization' = "Basic $token"
+    }
+
     $body = @{
         name     = 'lnx1234'
         os       = 'Red Hat'
@@ -23,8 +31,9 @@
     } | ConvertTo-Json -Compress
 
     $Properties = @{
-        Method = 'POST'
-        Uri    = "http://localhost:8080/api/vm/$($body)"
+        Method  = 'POST'
+        Headers = $headers
+        Uri     = "http://localhost:8080/api/vm/$($body)"
     }
 
     Invoke-RestMethod @Properties
@@ -180,11 +189,12 @@ function Test-Output{
                 Write-Host "$(($Data.Gettype() | Out-String).Trim())`n" -ForegroundColor Cyan
                 $Data = $Data | ConvertFrom-Json
             }
-            Write-Host "OS         : $($Data.os)"
-            Write-Host "Name       : $($Data.name)"
-            Write-Host "Subnet     : $($Data.subnet)"
-            Write-Host "Owner      : $($Data.owner)"
-            Write-Host "Action     : $($Data.action)"    
+            Write-Host "OS          : $($Data.os)"
+            Write-Host "Name        : $($Data.name)"
+            Write-Host "IPv4Address : $($Data.ipv4addr)"
+            Write-Host "Subnet      : $($Data.subnet)"
+            Write-Host "Owner       : $($Data.owner)"
+            Write-Host "Action      : $($Data.action)"    
         }catch{
             Write-Host "No sub-object" -ForegroundColor Yellow
             $Error.Clear()
@@ -210,7 +220,7 @@ function Invoke-PodeJsonResponse{
         Data as JSON-String, for example "{ 'name': 'lnx1234', 'os': 'Red Hat' }"
 
     .EXAMPLE
-        Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/vm/"{ name: 'lnx1234', os: 'Red Hat', ipv4addr: '10.26.0.34', subnet: '255.255.255.0', owner: 'tinu' }"
+        Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/vm/{"name":"lnx1234","version":"8","action":"create","owner":"tinu","ipv4addr":"10.26.0.34","os":"Red Hat","subnet":"255.255.255.0"}
     #>
     [CmdletBinding()]
     param(
@@ -255,22 +265,22 @@ function Invoke-PodeJsonResponse{
                 Test-Output -OutputObject $ret
 
                 #region Secret
-                # $SecretVault  = 'PSOctomes'
-                # $AllSecrets   = Get-MWASecretsFromVault -Vault $SecretVault
-                # $SecretObject = foreach($item in $AllSecrets){
-                #     try{
-                #         $Secret = Get-Secret -Vault $SecretVault -Name $item.Name -ErrorAction Stop
-                #         [PSCustomObject]@{
-                #             Name   = $item.Name
-                #             User   = $Secret.UserName
-                #             ApiUri = $item.ApiUri
-                #             Token = [System.Net.NetworkCredential]::new($Secret.UserName, $Secret.Password).Password
-                #         }
-                #     }catch{
-                #         $Error.Clear()
-                #     }
-                # }                
-                # Send-TelegramMessage -Message $ret -Html -PSOctomes $SecretObject
+                $SecretVault  = 'PSOctomes'
+                $AllSecrets   = Get-MWASecretsFromVault -Vault $SecretVault
+                $SecretObject = foreach($item in $AllSecrets){
+                    try{
+                        $Secret = Get-Secret -Vault $SecretVault -Name $item.Name -ErrorAction Stop
+                        [PSCustomObject]@{
+                            Name   = $item.Name
+                            User   = $Secret.UserName
+                            ApiUri = $item.ApiUri
+                            Token = [System.Net.NetworkCredential]::new($Secret.UserName, $Secret.Password).Password
+                        }
+                    }catch{
+                        $Error.Clear()
+                    }
+                }                
+                Send-TelegramMessage -Message $ret -Html -PSOctomes $SecretObject
                 #endregion
 
                 Write-PodeJsonResponse -Value $ret
@@ -301,9 +311,9 @@ Start-PodeServer {
 
     # setup basic auth (base64> username:password in header)
     New-PodeAuthScheme -Basic -Realm 'Pode Example Page' | Add-PodeAuth -Name 'Validate' -Sessionless -ScriptBlock {
-        param($username, $password)
+        param($usern, $passw)
         # here you'd check a real user storage, this is just for example
-        if ($username -eq 'morty' -and $password -eq 'pickle') {
+        if ($usern -eq 'morty' -and $passw -eq '%L[%%4FH5LMr2$Qrb){mw') {
             return @{
                 User = @{
                     Name = 'Superman'
