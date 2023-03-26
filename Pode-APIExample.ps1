@@ -157,26 +157,38 @@ function Send-TelegramMessage{
 }
 
 function Test-Output{
-    param($OutputObject)
+    param(
+        [Parameter(
+            Mandatory=$true,
+            ValueFromPipeline=$true,
+            ValueFromPipelineByPropertyName=$true,
+            Position = 0
+        )]
+        $OutputObject
+    )
     Write-Host "`nI get the following input to proceed:`n"
     Write-Host "$(($OutputObject | Out-String).Trim())`n" -ForegroundColor Cyan
 
     if($OutputObject -is [PSCustomObject]){
         Write-Host "$(($OutputObject.Gettype() | Out-String).Trim())`n" -ForegroundColor Cyan  
-        
-        $Data = $OutputObject | Select-Object -Expandproperty Data
-        Write-Host "Check sub-object"
-        if($Data.Gettype().Name -eq 'PSCustomObject'){
-            Write-Host "$(($Data.Gettype() | Out-String).Trim())`n" -ForegroundColor Cyan
-        }elseif($Data.Gettype().Name -eq 'String'){
-            Write-Host "$(($Data.Gettype() | Out-String).Trim())`n" -ForegroundColor Cyan
-            $Data = $Data | ConvertFrom-Json
+        try{
+            $Data = $OutputObject | Select-Object -Expandproperty Data -ErrorAction Stop
+            Write-Host "Check sub-object"
+            if($Data.Gettype().Name -eq 'PSCustomObject'){
+                Write-Host "$(($Data.Gettype() | Out-String).Trim())`n" -ForegroundColor Cyan
+            }elseif($Data.Gettype().Name -eq 'String'){
+                Write-Host "$(($Data.Gettype() | Out-String).Trim())`n" -ForegroundColor Cyan
+                $Data = $Data | ConvertFrom-Json
+            }
+            Write-Host "OS         : $($Data.os)"
+            Write-Host "Name       : $($Data.name)"
+            Write-Host "Subnet     : $($Data.subnet)"
+            Write-Host "Owner      : $($Data.owner)"
+            Write-Host "Action     : $($Data.action)"    
+        }catch{
+            Write-Host "No sub-object" -ForegroundColor Yellow
+            $Error.Clear()
         }
-        Write-Host "OS         : $($Data.os)"
-        Write-Host "Name       : $($Data.name)"
-        Write-Host "Subnet     : $($Data.subnet)"
-        Write-Host "Owner      : $($Data.owner)"
-        Write-Host "Action     : $($Data.action)"
     }else{
         Write-Warning "InputObject is not a PSCustomObject"
     }
@@ -231,15 +243,13 @@ function Invoke-PodeJsonResponse{
         Write-Verbose $('[', (Get-Date -f 'yyyy-MM-dd HH:mm:ss.fff'), ']', '[ Process ]', $function -Join ' ')
         try{
 
-            Add-PodeRoute -Method Post -Path "$($ApiUri)/$($ApiData)" -ScriptBlock {
+            Add-PodeRoute -Method Post -Path "$($ApiUri)/$($ApiData)" -Authentication 'Validate' -ScriptBlock {
 
                 $ret = [PSCustomObject]@{
-                    StatusCode        = 200
-                    StatusDescription = 'OK'
-                    TimeStamp         = Get-Date -f 'yyyy-MM-dd HH:mm:ss.fff'
-                    Uuid              = (New-Guid | Select-Object -ExpandProperty Guid)
-                    Source            = $env:COMPUTERNAME
-                    Data              = ($WebEvent.Parameters['json']) | ConvertFrom-Json
+                    TimeStamp = Get-Date -f 'yyyy-MM-dd HH:mm:ss.fff'
+                    Uuid      = (New-Guid | Select-Object -ExpandProperty Guid)
+                    Source    = $env:COMPUTERNAME
+                    Data      = ($WebEvent.Parameters['json']) | ConvertFrom-Json
                 }
 
                 Test-Output -OutputObject $ret
@@ -265,7 +275,7 @@ function Invoke-PodeJsonResponse{
 
                 Write-PodeJsonResponse -Value $ret
 
-            } -PassThru # needed for Test-Output
+            } -PassThru | Test-Output
 
         }catch{
             Write-Warning $('ScriptName:', $($_.InvocationInfo.ScriptName), 'LineNumber:', $($_.InvocationInfo.ScriptLineNumber), 'Message:', $($_.Exception.Message) -Join ' ')
@@ -286,6 +296,22 @@ function Invoke-PodeJsonResponse{
 }
 
 Start-PodeServer {
+
+    New-PodeLoggingMethod -Terminal | Enable-PodeRequestLogging
+
+    # setup basic auth (base64> username:password in header)
+    New-PodeAuthScheme -Basic -Realm 'Pode Example Page' | Add-PodeAuth -Name 'Validate' -Sessionless -ScriptBlock {
+        param($username, $password)
+        # here you'd check a real user storage, this is just for example
+        if ($username -eq 'morty' -and $password -eq 'pickle') {
+            return @{
+                User = @{
+                    Name = 'Superman'
+                }
+            }
+        }
+        return @{ Message = 'Invalid details supplied' }
+    }
 
     Write-Host "Running Pode server on $($PSScriptRoot)" -ForegroundColor Cyan
     Write-Host "Press Ctrl. + C to terminate the Pode server" -ForegroundColor Yellow
