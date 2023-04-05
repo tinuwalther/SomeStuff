@@ -33,10 +33,11 @@
     $Properties = @{
         Method  = 'POST'
         Headers = $headers
-        Uri     = "http://localhost:8080/api/vm/$($body)"
+        Uri     = "http://localhost:8080/api"
+        Body    = $body
     }
 
-    Invoke-RestMethod @Properties
+    $response = Invoke-RestMethod @Properties
 
 #>
 [CmdletBinding()]
@@ -189,12 +190,20 @@ function Test-Output{
                 Write-Host "$(($Data.Gettype() | Out-String).Trim())`n" -ForegroundColor Cyan
                 $Data = $Data | ConvertFrom-Json
             }
-            Write-Host "OS          : $($Data.os)"
-            Write-Host "Name        : $($Data.name)"
-            Write-Host "IPv4Address : $($Data.ipv4addr)"
-            Write-Host "Subnet      : $($Data.subnet)"
-            Write-Host "Owner       : $($Data.owner)"
-            Write-Host "Action      : $($Data.action)"    
+            Write-Host "OS          : $($Data.os)"       -ForegroundColor Cyan
+            Write-Host "Name        : $($Data.name)"     -ForegroundColor Cyan
+            Write-Host "IPv4Address : $($Data.ipv4addr)" -ForegroundColor Cyan
+            Write-Host "Subnet      : $($Data.subnet)"   -ForegroundColor Cyan
+            Write-Host "Owner       : $($Data.owner)"    -ForegroundColor Cyan
+            Write-Host "Action      : $($Data.action)"   -ForegroundColor Cyan
+
+            switch ($Data.action){
+                'create' { ">> Create VM!" | Out-PodeHost }
+                'update' { ">> Update VM!" | Out-PodeHost }
+                'delete' { ">> Delete VM!" | Out-PodeHost }
+                default { "$($Data.action)" | Out-PodeHost }
+            }
+
         }catch{
             Write-Host "No sub-object" -ForegroundColor Yellow
             $Error.Clear()
@@ -265,22 +274,22 @@ function Invoke-PodeJsonResponse{
                 Test-Output -OutputObject $ret
 
                 #region Secret
-                $SecretVault  = 'PSOctomes'
-                $AllSecrets   = Get-MWASecretsFromVault -Vault $SecretVault
-                $SecretObject = foreach($item in $AllSecrets){
-                    try{
-                        $Secret = Get-Secret -Vault $SecretVault -Name $item.Name -ErrorAction Stop
-                        [PSCustomObject]@{
-                            Name   = $item.Name
-                            User   = $Secret.UserName
-                            ApiUri = $item.ApiUri
-                            Token = [System.Net.NetworkCredential]::new($Secret.UserName, $Secret.Password).Password
-                        }
-                    }catch{
-                        $Error.Clear()
-                    }
-                }                
-                Send-TelegramMessage -Message $ret -Html -PSOctomes $SecretObject
+                # $SecretVault  = 'PSOctomes'
+                # $AllSecrets   = Get-MWASecretsFromVault -Vault $SecretVault
+                # $SecretObject = foreach($item in $AllSecrets){
+                #     try{
+                #         $Secret = Get-Secret -Vault $SecretVault -Name $item.Name -ErrorAction Stop
+                #         [PSCustomObject]@{
+                #             Name   = $item.Name
+                #             User   = $Secret.UserName
+                #             ApiUri = $item.ApiUri
+                #             Token = [System.Net.NetworkCredential]::new($Secret.UserName, $Secret.Password).Password
+                #         }
+                #     }catch{
+                #         $Error.Clear()
+                #     }
+                # }                
+                # Send-TelegramMessage -Message $ret -Html -PSOctomes $SecretObject
                 #endregion
 
                 Write-PodeJsonResponse -Value $ret
@@ -327,7 +336,22 @@ Start-PodeServer {
     Write-Host "Press Ctrl. + C to terminate the Pode server" -ForegroundColor Yellow
 
     Add-PodeEndpoint -Address localhost -Port 8080 -Protocol Http
+    
+    #Invoke-PodeJsonResponse -ApiUri '/api/vm' -ApiData ':json'
 
-    Invoke-PodeJsonResponse -ApiUri '/api/vm' -ApiData ':json'
+    Enable-PodeSessionMiddleware -Duration 120
+
+    Add-PodeRoute -Method Post -Path '/api' -ContentType 'application/json' -ScriptBlock {
+        # route logic
+        $ret = [PSCustomObject]@{
+            TimeStamp = Get-Date -f 'yyyy-MM-dd HH:mm:ss.fff'
+            Uuid      = (New-Guid | Select-Object -ExpandProperty Guid)
+            Source    = $env:COMPUTERNAME
+            Data      = $WebEvent.Data
+        }
+        #$($WebEvent.Data) | Out-PodeHost
+        Test-Output -OutputObject $ret
+        Write-PodeJsonResponse -Value $($ret | ConvertTo-Json)
+    }
 
 }
