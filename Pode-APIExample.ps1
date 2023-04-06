@@ -33,7 +33,7 @@
     $Properties = @{
         Method  = 'POST'
         Headers = $headers
-        Uri     = "http://localhost:8080/api"
+        Uri     = "http://localhost:8080/api/v1/vm"
         Body    = $body
     }
 
@@ -190,12 +190,6 @@ function Test-Output{
                 Write-Host "$(($Data.Gettype() | Out-String).Trim())`n" -ForegroundColor Cyan
                 $Data = $Data | ConvertFrom-Json
             }
-            Write-Host "OS          : $($Data.os)"       -ForegroundColor Cyan
-            Write-Host "Name        : $($Data.name)"     -ForegroundColor Cyan
-            Write-Host "IPv4Address : $($Data.ipv4addr)" -ForegroundColor Cyan
-            Write-Host "Subnet      : $($Data.subnet)"   -ForegroundColor Cyan
-            Write-Host "Owner       : $($Data.owner)"    -ForegroundColor Cyan
-            Write-Host "Action      : $($Data.action)"   -ForegroundColor Cyan
 
             switch ($Data.action){
                 'create' { ">> Create VM!" | Out-PodeHost }
@@ -203,6 +197,13 @@ function Test-Output{
                 'delete' { ">> Delete VM!" | Out-PodeHost }
                 default { "$($Data.action)" | Out-PodeHost }
             }
+
+            Write-Host "OS          : $($Data.os)"       -ForegroundColor Cyan
+            Write-Host "Name        : $($Data.name)"     -ForegroundColor Cyan
+            Write-Host "IPv4Address : $($Data.ipv4addr)" -ForegroundColor Cyan
+            Write-Host "Subnet      : $($Data.subnet)"   -ForegroundColor Cyan
+            Write-Host "Owner       : $($Data.owner)"    -ForegroundColor Cyan
+            Write-Host "Action      : $($Data.action)"   -ForegroundColor Cyan
 
         }catch{
             Write-Host "No sub-object" -ForegroundColor Yellow
@@ -341,17 +342,18 @@ Start-PodeServer {
 
     Enable-PodeSessionMiddleware -Duration 120
 
-    Add-PodeRoute -Method Post -Path '/api' -ContentType 'application/json' -ScriptBlock {
+    Add-PodeRoute -Method Post -Path '/api/v1/vm' -ContentType 'application/json' -ScriptBlock {
         # route logic
         $ret = [PSCustomObject]@{
             TimeStamp = Get-Date -f 'yyyy-MM-dd HH:mm:ss.fff'
             Uuid      = (New-Guid | Select-Object -ExpandProperty Guid)
             Source    = $env:COMPUTERNAME
+            Agent     = $WebEvent.Request.UserAgent
             Data      = $WebEvent.Data
         }
         #$($WebEvent.Data) | Out-PodeHost
-        Test-Output -OutputObject $ret
         Write-PodeJsonResponse -Value $($ret | ConvertTo-Json)
+        Test-Output -OutputObject $ret
     }
 
 }
