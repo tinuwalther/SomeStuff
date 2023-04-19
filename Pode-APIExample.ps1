@@ -342,7 +342,7 @@ Start-PodeServer {
 
     Enable-PodeSessionMiddleware -Duration 120
 
-    Add-PodeRoute -Method Post -Path '/api/v1/vm' -ContentType 'application/json' -ScriptBlock {
+    Add-PodeRoute -Method Post -Path '/api/v1/vm' -Authentication 'Validate' -ContentType 'application/json' -ScriptBlock {
         # route logic
         $ret = [PSCustomObject]@{
             TimeStamp = Get-Date -f 'yyyy-MM-dd HH:mm:ss.fff'
